@@ -2,6 +2,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
 
+public enum eGolfGameState
+{
+    setup,
+    playing,
+    roundover,
+    gameover
+}
 
 public class Golf : MonoBehaviourPunCallbacks
 {
@@ -9,9 +16,11 @@ public class Golf : MonoBehaviourPunCallbacks
 
     public GameObject deckGO;
     public Deck deck;
+
     public List<Card> deckCards;
     public List<CardGolf> drawPile;
     public List<CardGolf> discardPile;
+    public eGolfGameState gameState = eGolfGameState.setup;
 
     private List<GameObject> playerGOs;
     private List<PlayerScript> playerPMs;
@@ -57,10 +66,13 @@ public class Golf : MonoBehaviourPunCallbacks
             PositionCards();
         } else
         {
+            //everyone else's camera rotates so their own hand is in front of them
             RotateCamera();
         }
     }
 
+    //only Master Client accesses this
+    //instantiates deck prefab, shuffles the deck, and creates the draw pile
     private void CreateDeck()
     {
         deckGO = PhotonNetwork.InstantiateRoomObject("Deck", new Vector3(0, 0, 0), Quaternion.identity);
@@ -70,6 +82,8 @@ public class Golf : MonoBehaviourPunCallbacks
         drawPile = ConvertListCardsToListCardProspectors(deckCards);
     }
 
+    //every client other than master client calls this
+    //rotates camera so that each client's hand is at the bottom of the screen
     private void RotateCamera()
     {
         for (int i = 1; i < PhotonNetwork.PlayerList.Length; i++)
@@ -165,7 +179,7 @@ public class Golf : MonoBehaviourPunCallbacks
             for (int j = 0; j < 4; j++)
             {
                 CardGolf card = Draw();
-                card.state = eGolfCardState.hand;
+                
                 newHand[j] = card;
             }
             string[] newStringHand = ConvertHandToStrings(newHand);

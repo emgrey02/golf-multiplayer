@@ -4,19 +4,21 @@ using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
 
+public enum eGolfPlayerState
+{
+    peaking,
+    waiting,
+    playing
+}
 public class PlayerScript : MonoBehaviourPunCallbacks
 {
     public CardGolf[] hand;
     public Player player;
     public string playerName;
     public GameObject playerGO;
-
-    public Transform cameraTransform;
-    
     public bool myTurn;
 
-    public Transform playerPOS;
-
+    public eGolfPlayerState state = eGolfPlayerState.waiting;
     
     private void Awake()
     {
@@ -37,10 +39,12 @@ public class PlayerScript : MonoBehaviourPunCallbacks
             if (PhotonNetwork.LocalPlayer.IsMasterClient)
             {
                 PhotonView cardView = this.hand[i].GetComponent<PhotonView>();
-                print("before card owner: " + cardView.Owner);
+                
                 cardView.TransferOwnership(player);
-                print("new card owner: " + cardView.Owner);
             }
+
+            CardGolf cardScript = this.hand[i].GetComponent<CardGolf>();
+            cardScript.state = eGolfCardState.hand;
         }
     }
 
@@ -66,7 +70,6 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         {
             this.hand[i].transform.position = pos[i];
         }
-
     }
 
     public CardGolf ConvertStringToCard(string name)

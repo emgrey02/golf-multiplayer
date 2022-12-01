@@ -12,7 +12,7 @@ public enum eGolfCardState
 
 public class CardGolf : Card
 {
-    [Header("Set Dynamically: CardProspector")]
+    [Header("Set Dynamically")]
     // this is how you use the enum eCardState
     public eGolfCardState state = eGolfCardState.drawpile;
 
@@ -23,6 +23,5 @@ public class CardGolf : Card
 
         // also call the base class (Card.cs) version of this method
         base.OnMouseUpAsButton();
-
     }
 }

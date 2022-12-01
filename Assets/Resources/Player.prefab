@@ -198,6 +198,5 @@ MonoBehaviour:
   hand: []
   playerName: 
   playerGO: {fileID: 0}
-  cameraTransform: {fileID: 0}
   myTurn: 0
-  playerPOS: {fileID: 0}
+  state: 1

@@ -18,6 +18,7 @@ public class Card : MonoBehaviour {
 	// list of the SpriteRenderer Components of this GameoObject and its children
 	public SpriteRenderer[] spriteRenderers;
 
+	[SerializeField]
 	public bool faceUp {
 		get {
 			return (!back.activeSelf);
