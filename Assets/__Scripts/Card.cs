@@ -1,8 +1,9 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using Photon.Pun;
 
-public class Card : MonoBehaviour {
+public class Card : MonoBehaviourPunCallbacks {
 
 	public string    suit;
 	public int       rank;

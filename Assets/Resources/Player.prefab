@@ -197,6 +197,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   hand: []
   playerName: 
+  actorNum: 0
   playerGO: {fileID: 0}
   myTurn: 0
+  overlay: {fileID: 0}
   state: 1

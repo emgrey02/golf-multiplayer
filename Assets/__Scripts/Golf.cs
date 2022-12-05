@@ -1,16 +1,20 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
+using ExitGames.Client.Photon;
+using Photon.Realtime;
+using Photon.Pun.UtilityScripts;
 
 public enum eGolfGameState
 {
     setup,
+    peaking,
     playing,
     roundover,
     gameover
 }
 
-public class Golf : MonoBehaviourPunCallbacks
+public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
 {
     public TextAsset deckXML;
 
@@ -21,10 +25,14 @@ public class Golf : MonoBehaviourPunCallbacks
     public List<CardGolf> drawPile;
     public List<CardGolf> discardPile;
     public eGolfGameState gameState = eGolfGameState.setup;
+    public PunTurnManager turnManager;
 
     private List<GameObject> playerGOs;
     private List<PlayerScript> playerPMs;
     private List<PhotonView> playerViews;
+
+    private const int maxPeaks = 2;
+    private int peakCount = 0;
 
     private Vector3[] localPositions = new Vector3[] { new Vector3(-2f, -6f, 0), new Vector3(2f, -6f, 0), new Vector3(-2f, -10.5f, 0), new Vector3(2f, -10.5f, 0) };
     private Vector3[] oppPositions = new Vector3[] { new Vector3(2, 6, 0), new Vector3(-2, 6, 0), new Vector3(2, 10.5f, 0), new Vector3(-2, 10.5f, 0) };
@@ -37,6 +45,8 @@ public class Golf : MonoBehaviourPunCallbacks
         playerGOs = new List<GameObject>();
         playerPMs = new List<PlayerScript>();
         playerViews = new List<PhotonView>();
+
+        turnManager = new PunTurnManager();
     }
 
     private void Start()
@@ -68,6 +78,111 @@ public class Golf : MonoBehaviourPunCallbacks
         {
             //everyone else's camera rotates so their own hand is in front of them
             RotateCamera();
+        }
+
+        //set first game state - peaking
+        gameState = eGolfGameState.peaking;
+    }
+
+    public void SetPeakCustProp()
+    {
+        Hashtable custProps = new Hashtable();
+        custProps.Add("Peak", "done");
+        PhotonNetwork.LocalPlayer.SetCustomProperties(custProps);
+    }
+
+    
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+    {
+        base.OnPlayerPropertiesUpdate(targetPlayer, changedProps);
+        if (PhotonNetwork.LocalPlayer.IsMasterClient)
+        {
+            CheckForEndPeakingState();
+        }
+    }
+
+    //only master client uses this method
+    private void CheckForEndPeakingState()
+    {
+        //time to check player custom props and get a list of
+        //players who are done peaking
+        List<PlayerScript> playersDonePeaking = new List<PlayerScript>();
+        int count = 0;
+        for (int i = 0; i < playerGOs.Count; i++)
+        {
+            if (PhotonNetwork.PlayerList[i].CustomProperties["Peak"] != null)
+            {
+                count++;
+                playersDonePeaking.Add(playerPMs[i]);
+            }
+        }
+
+        //set player state to "waiting" if they are done peaking but there are still
+        //others peaking
+        if (count < playerPMs.Count)
+        {
+            for (int j = 0; j < playersDonePeaking.Count; j++)
+            {
+                SetPlayerState(playersDonePeaking[j].photonView, "waiting");
+            }
+        }
+
+        //if everyone is done peaking, then flip all the cards over and
+        //change the game state
+        if (count == playerPMs.Count)
+        {
+            print("all players have peaked. Changing player state");
+            FlipCards();
+            ChangePlayerStates("waiting");
+            Camera.main.gameObject.GetPhotonView().RPC("SyncGameState", RpcTarget.All, "playing");
+            MoveDrawPile();
+            MoveToDiscard(Draw());
+        }
+    }
+
+    public void MoveDrawPile()
+    {
+        for (int i = 0; i < drawPile.Count; i++)
+        {
+            drawPile[i].photonView.RPC("SetCardProps", RpcTarget.All, new Vector3(-1.5f, 0, 0), false);
+        }
+    }
+    [PunRPC]
+    public void SyncGameState(string state)
+    {
+        if (state == "playing")
+        {
+            gameState = eGolfGameState.playing;
+        }
+    }
+
+    //flip that, that that that that that that
+    private void FlipCards()
+    {
+        if (PhotonNetwork.LocalPlayer.IsMasterClient)
+        {
+            print("flipping hand");
+            for (int i = 0; i < playerViews.Count; i++)
+            {
+                playerViews[i].RPC("ResetHand", RpcTarget.All);
+            }
+        }
+    }
+
+    private void SetPlayerState(PhotonView p, string s)
+    {
+        p.RPC("SyncPlayerState", RpcTarget.All, s);
+    }
+
+    private void ChangePlayerStates(string pState)
+    {
+        if (PhotonNetwork.LocalPlayer.IsMasterClient)
+        {
+            print("changing player states to " + pState);
+            for (int i = 0; i < playerViews.Count; i++)
+            {
+                playerViews[i].RPC("SyncPlayerState", RpcTarget.All, pState);
+            }
         }
     }
 
@@ -111,9 +226,12 @@ public class Golf : MonoBehaviourPunCallbacks
         {
             playerPMs[i].player = PhotonNetwork.PlayerList[i];
             playerPMs[i].playerName = PhotonNetwork.PlayerList[i].NickName;
-            playerViews[i].RPC("SyncName", RpcTarget.Others, playerPMs[i].playerName);
+            playerPMs[i].actorNum = PhotonNetwork.PlayerList[i].ActorNumber;
+
+            playerViews[i].RPC("SyncPlayer", RpcTarget.All, playerPMs[i].playerName, playerPMs[i].player, playerPMs[i].actorNum);
             //RPC in PlayerScript
         }
+        ChangePlayerStates("peaking");
     }
 
     //only MasterClient accesses this
@@ -185,7 +303,6 @@ public class Golf : MonoBehaviourPunCallbacks
             string[] newStringHand = ConvertHandToStrings(newHand);
             playerViews[i].RPC("SyncHand", RpcTarget.All, newStringHand);
         }
-        
     }
 
     //we use this at the beginning when putting cards into the deck
@@ -211,18 +328,23 @@ public class Golf : MonoBehaviourPunCallbacks
 
     public void CardClicked(CardGolf cd)
     {
-        // the reaction is determined by the state of the clicked card
+        // the reaction is determined by the state of the clicked card,
+        // the game state, and the player state
         switch (cd.state)
         {
             case eGolfCardState.hand:
-                if (cd.GetComponent<PhotonView>().IsMine)
+                if (cd.GetComponent<PhotonView>().IsMine && gameState == eGolfGameState.peaking)
                 {
-                    if (cd.faceUp)
+                    if (peakCount < maxPeaks)
                     {
-                        cd.faceUp = false;
-                    } else
-                    {
-                        cd.faceUp = true;
+                        if (cd.faceUp)
+                        {
+                            cd.faceUp = false;
+                        } else
+                        {
+                            cd.faceUp = true;
+                            peakCount++;
+                        }
                     }
                 }
                 break;
@@ -237,5 +359,43 @@ public class Golf : MonoBehaviourPunCallbacks
                 
                 break;
         }
+    }
+
+    void MoveToDiscard(CardGolf cd)
+    {
+        //set state of card to discard
+        cd.gameObject.GetPhotonView().RPC("SetCardState", RpcTarget.All, "discard");
+        discardPile.Add(cd);
+
+        // position this card on the discardPile
+        cd.gameObject.GetPhotonView().RPC("SetCardProps", RpcTarget.All, new Vector3(1.5f, 0, 0), true);
+
+        // place it on top of the pile for depth sorting
+        cd.SetSortOrder(-100 + discardPile.Count);
+    }
+
+    public void OnTurnBegins(int turn)
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public void OnTurnCompleted(int turn)
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public void OnPlayerMove(Player player, int turn, object move)
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public void OnPlayerFinished(Player player, int turn, object move)
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public void OnTurnTimeEnds(int turn)
+    {
+        throw new System.NotImplementedException();
     }
 }

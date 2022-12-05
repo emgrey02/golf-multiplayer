@@ -1,3 +1,4 @@
+using Photon.Pun;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -23,5 +24,29 @@ public class CardGolf : Card
 
         // also call the base class (Card.cs) version of this method
         base.OnMouseUpAsButton();
+    }
+
+    [PunRPC]
+    public void SetCardState(string s)
+    {
+        if (s == "discard")
+        {
+            state = eGolfCardState.discard;
+        }
+        if (s == "drawpile")
+        {
+            state = eGolfCardState.drawpile;
+        }
+        if (s == "hand")
+        {
+            state = eGolfCardState.hand;
+        }
+    }
+
+    [PunRPC]
+    public void SetCardProps(Vector3 pos, bool faceUp)
+    {
+        this.transform.localPosition = pos;
+        this.faceUp = faceUp;
     }
 }
