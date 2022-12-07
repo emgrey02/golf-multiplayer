@@ -11,11 +11,9 @@ public class UIOverlay : MonoBehaviourPunCallbacks
 
     private TextMeshProUGUI message;
 
-    private TextMeshProUGUI donePeakingButtonText;
-
     public GameObject donePeakingButton;
-    //public GameObject swapButton;
-    //public GameObject discardButton;
+    public GameObject swapButton;
+    public GameObject discardButton;
 
     private void Awake()
     {
@@ -25,11 +23,8 @@ public class UIOverlay : MonoBehaviourPunCallbacks
         message.text = "";
 
         donePeakingButton = overlay.transform.GetChild(1).gameObject;
-        //swapButton = overlay.transform.GetChild(2).gameObject;
-        //discardButton = overlay.transform.GetChild(3).gameObject;
-
-        donePeakingButtonText = donePeakingButton.transform.GetChild(0).GetComponent<TextMeshProUGUI>(); 
-
+        swapButton = overlay.transform.GetChild(2).gameObject;
+        discardButton = overlay.transform.GetChild(3).gameObject;
 
         DeactivateButtons();
         overlay.SetActive(false);
@@ -41,8 +36,19 @@ public class UIOverlay : MonoBehaviourPunCallbacks
         if (playerState == eGolfPlayerState.peaking)
         { 
             title.text = "Peak at two cards in your hand. Memorize them!";
-            donePeakingButtonText.text = "I'm done peaking";
             donePeakingButton.SetActive(true);
+        }
+
+        if (playerState == eGolfPlayerState.deciding)
+        {
+            title.text = "Discard, or swap with a card in your hand.";
+            swapButton.SetActive(true);
+            discardButton.SetActive(true);
+        }
+
+        if (playerState == eGolfPlayerState.swapping)
+        {
+            title.text = "Choose a card from your hand to swap this with.";
         }
     }
 
@@ -53,6 +59,8 @@ public class UIOverlay : MonoBehaviourPunCallbacks
 
     public void RemoveOverlay()
     {
+        Debug.Log("removing overlay");
+        title.text = "";
         overlay.SetActive(false);
         DeactivateButtons();
     }
@@ -60,8 +68,8 @@ public class UIOverlay : MonoBehaviourPunCallbacks
     private void DeactivateButtons()
     {
         donePeakingButton.SetActive(false);
-        //swapButton.SetActive(false);
-        //discardButton.SetActive(false);
+        swapButton.SetActive(false);
+        discardButton.SetActive(false);
     }
 
     public void SetMessage(string m)

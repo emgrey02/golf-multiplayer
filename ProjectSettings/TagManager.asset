@@ -3,7 +3,8 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - Deck
   layers:
   - Default
   - TransparentFX
@@ -40,4 +41,19 @@ TagManager:
   m_SortingLayers:
   - name: Default
     uniqueID: 0
+    locked: 0
+  - name: drawpile
+    uniqueID: 2286617999
+    locked: 0
+  - name: discardpile
+    uniqueID: 720345191
+    locked: 0
+  - name: hand
+    uniqueID: 1946855573
+    locked: 0
+  - name: overlay
+    uniqueID: 2507848473
+    locked: 0
+  - name: target
+    uniqueID: 969971245
     locked: 0

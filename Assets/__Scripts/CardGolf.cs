@@ -8,6 +8,7 @@ public enum eGolfCardState
 {
     drawpile,
     hand,
+    target,
     discard
 }
 
@@ -41,12 +42,18 @@ public class CardGolf : Card
         {
             state = eGolfCardState.hand;
         }
+        if (s == "target")
+        {
+            state = eGolfCardState.target;
+        }
     }
 
     [PunRPC]
-    public void SetCardProps(Vector3 pos, bool faceUp)
+    public void SetCardProps(Vector3 pos, bool faceUp, int sortOrder, string sortName)
     {
         this.transform.localPosition = pos;
         this.faceUp = faceUp;
+        this.SetSortOrder(sortOrder);
+        this.SetSortingLayerName(sortName);
     }
 }

@@ -3,18 +3,18 @@ using UnityEngine;
 using Photon.Pun;
 using ExitGames.Client.Photon;
 using Photon.Realtime;
-using Photon.Pun.UtilityScripts;
 
 public enum eGolfGameState
 {
     setup,
     peaking,
     playing,
+    swapping,
     roundover,
     gameover
 }
 
-public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
+public class Golf : MonoBehaviourPunCallbacks
 {
     public TextAsset deckXML;
 
@@ -25,7 +25,12 @@ public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
     public List<CardGolf> drawPile;
     public List<CardGolf> discardPile;
     public eGolfGameState gameState = eGolfGameState.setup;
-    public PunTurnManager turnManager;
+
+    public GameObject canvas;
+
+    public CardGolf target;
+
+    public int currentPlayerTurn;
 
     private List<GameObject> playerGOs;
     private List<PlayerScript> playerPMs;
@@ -33,6 +38,12 @@ public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
 
     private const int maxPeaks = 2;
     private int peakCount = 0;
+
+    private bool disableClicks = false;
+
+    public const byte onDrawEventCode = 1;
+    public const byte onDiscardEventCode = 2;
+    public const byte onSwapEventCode = 3;
 
     private Vector3[] localPositions = new Vector3[] { new Vector3(-2f, -6f, 0), new Vector3(2f, -6f, 0), new Vector3(-2f, -10.5f, 0), new Vector3(2f, -10.5f, 0) };
     private Vector3[] oppPositions = new Vector3[] { new Vector3(2, 6, 0), new Vector3(-2, 6, 0), new Vector3(2, 10.5f, 0), new Vector3(-2, 10.5f, 0) };
@@ -46,7 +57,7 @@ public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
         playerPMs = new List<PlayerScript>();
         playerViews = new List<PhotonView>();
 
-        turnManager = new PunTurnManager();
+        canvas = GameObject.Find("Canvas");
     }
 
     private void Start()
@@ -82,22 +93,41 @@ public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
 
         //set first game state - peaking
         gameState = eGolfGameState.peaking;
+
+
     }
 
+    //this method runs when a player presses the "I'm done peaking" button
+    //sets the player's custom prop
     public void SetPeakCustProp()
     {
+        Debug.Log("button pressed.");
         Hashtable custProps = new Hashtable();
         custProps.Add("Peak", "done");
         PhotonNetwork.LocalPlayer.SetCustomProperties(custProps);
     }
 
-    
+    //this is called when the custom prop change is registered
     public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
     {
         base.OnPlayerPropertiesUpdate(targetPlayer, changedProps);
-        if (PhotonNetwork.LocalPlayer.IsMasterClient)
+        if (PhotonNetwork.LocalPlayer.IsMasterClient && (gameState == eGolfGameState.peaking))
         {
+            Debug.Log("master client checking end peaking state");
             CheckForEndPeakingState();
+        }
+    }
+
+    public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+    {
+        base.OnRoomPropertiesUpdate(propertiesThatChanged);
+        if (PhotonNetwork.LocalPlayer.IsMasterClient && gameState == eGolfGameState.playing)
+        {
+            Debug.Log("updating turn vars");
+            for (int i = 0; i < playerPMs.Count; i++)
+            {
+                playerPMs[i].photonView.RPC("UpdateTurnVar", RpcTarget.All);
+            }
         }
     }
 
@@ -121,6 +151,7 @@ public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
         //others peaking
         if (count < playerPMs.Count)
         {
+            Debug.Log("set player state to waiting");
             for (int j = 0; j < playersDonePeaking.Count; j++)
             {
                 SetPlayerState(playersDonePeaking[j].photonView, "waiting");
@@ -134,9 +165,58 @@ public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
             print("all players have peaked. Changing player state");
             FlipCards();
             ChangePlayerStates("waiting");
-            Camera.main.gameObject.GetPhotonView().RPC("SyncGameState", RpcTarget.All, "playing");
+            Camera.main.gameObject.GetPhotonView().RPC(nameof(SyncGameState), RpcTarget.All, "playing");
             MoveDrawPile();
             MoveToDiscard(Draw());
+            Camera.main.gameObject.GetPhotonView().RPC(nameof(AssignTurn), RpcTarget.All, playerPMs[0].actorNum);
+        }
+    }
+
+    [PunRPC]
+    public void AssignTurn(int actorNum)
+    {
+        print("assigning next turn");
+        currentPlayerTurn = actorNum;
+
+        Hashtable custProps = new Hashtable();
+        custProps.Add("currentTurn", actorNum.ToString());
+        PhotonNetwork.CurrentRoom.SetCustomProperties(custProps);
+
+        disableClicks = false;
+        
+        if (PhotonNetwork.LocalPlayer.IsMasterClient && currentPlayerTurn != PhotonNetwork.LocalPlayer.ActorNumber)
+        {
+            for (int i = 0; i < drawPile.Count; i++)
+            {
+                drawPile[i].photonView.TransferOwnership(PhotonNetwork.CurrentRoom.GetPlayer(actorNum));
+            }
+            for (int i = 0; i < discardPile.Count; i++)
+            {
+                discardPile[i].photonView.TransferOwnership(PhotonNetwork.CurrentRoom.GetPlayer(actorNum));
+            }
+        } else
+        {
+            for (int i = 0; i < drawPile.Count; i++)
+            {
+                drawPile[i].photonView.TransferOwnership(PhotonNetwork.CurrentRoom.GetPlayer(actorNum));
+            }
+            for (int i = 0; i < discardPile.Count; i++)
+            {
+                discardPile[i].photonView.TransferOwnership(PhotonNetwork.CurrentRoom.GetPlayer(actorNum));
+            }
+        }
+    }
+
+    private int GetNextTurn()
+    {
+        int numPlayers = playerPMs.Count;
+        Debug.Log(currentPlayerTurn + "vs" + numPlayers);
+        if (currentPlayerTurn < numPlayers)
+        {
+            return currentPlayerTurn + 1;
+        } else
+        {
+            return 1;
         }
     }
 
@@ -144,15 +224,21 @@ public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
     {
         for (int i = 0; i < drawPile.Count; i++)
         {
-            drawPile[i].photonView.RPC("SetCardProps", RpcTarget.All, new Vector3(-1.5f, 0, 0), false);
+            drawPile[i].photonView.RPC("SetCardProps", RpcTarget.All, new Vector3(-1.5f, 0, 0), false, 0, "drawpile");
         }
     }
+
     [PunRPC]
     public void SyncGameState(string state)
     {
         if (state == "playing")
         {
             gameState = eGolfGameState.playing;
+        }
+
+        if (state == "swapping")
+        {
+            gameState = eGolfGameState.swapping;
         }
     }
 
@@ -169,11 +255,13 @@ public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
         }
     }
 
+    //set an individual player's state
     private void SetPlayerState(PhotonView p, string s)
     {
         p.RPC("SyncPlayerState", RpcTarget.All, s);
     }
 
+    //set all players state to same thing
     private void ChangePlayerStates(string pState)
     {
         if (PhotonNetwork.LocalPlayer.IsMasterClient)
@@ -194,7 +282,7 @@ public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
         deck = deckGO.GetComponent<Deck>();
         deckCards = deck.GetCards(deckGO);
         Deck.Shuffle(ref deckCards);
-        drawPile = ConvertListCardsToListCardProspectors(deckCards);
+        drawPile = ConvertListCardsToListCardGolfs(deckCards);
     }
 
     //every client other than master client calls this
@@ -206,14 +294,17 @@ public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
             if (((i == 1 && PhotonNetwork.PlayerList.Length == 2) || i == 2) && (PhotonNetwork.LocalPlayer == PhotonNetwork.PlayerList[i]))
             {
                 Camera.main.transform.Rotate(0, 0, -180);
+                canvas.transform.Rotate(0, 0, -180);
             }
             else if ((i == 1 && PhotonNetwork.PlayerList.Length > 2) && (PhotonNetwork.LocalPlayer == PhotonNetwork.PlayerList[i]))
             {
                 Camera.main.transform.Rotate(0, 0, -90);
+                canvas.transform.Rotate(0, 0, -90);
             }
             else if (i == 3 && PhotonNetwork.LocalPlayer == PhotonNetwork.PlayerList[i])
             {
                 Camera.main.transform.Rotate(0, 0, 90);
+                canvas.transform.Rotate(0, 0, 90);
             }
         }
     }
@@ -306,7 +397,7 @@ public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
     }
 
     //we use this at the beginning when putting cards into the deck
-    List<CardGolf> ConvertListCardsToListCardProspectors(List<Card> lCD)
+    List<CardGolf> ConvertListCardsToListCardGolfs(List<Card> lCD)
     {
         List<CardGolf> lCP = new List<CardGolf>();
         CardGolf tCP;
@@ -319,10 +410,17 @@ public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
     }
 
     // the draw function will pull a single card from the drawPile and return it
-    CardGolf Draw()
+    public CardGolf Draw()
     {
-        CardGolf cd = drawPile[0]; 
-        drawPile.RemoveAt(0);
+        CardGolf cd = drawPile[drawPile.Count - 1]; 
+        drawPile.RemoveAt(drawPile.Count - 1);
+        return (cd);
+    }
+
+    public CardGolf DrawFromDiscard()
+    {
+        CardGolf cd = discardPile[discardPile.Count - 1];
+        discardPile.RemoveAt(discardPile.Count - 1);
         return (cd);
     }
 
@@ -347,55 +445,190 @@ public class Golf : MonoBehaviourPunCallbacks, IPunTurnManagerCallbacks
                         }
                     }
                 }
+
+                if (cd.GetComponent<PhotonView>().IsMine && gameState == eGolfGameState.swapping)
+                {
+                    SendOnDiscardEvent(cd.name);
+                    SyncGameState("playing");
+                }
                 break;
 
             case eGolfCardState.drawpile:
-                //MoveToDiscard(target);
-                //MoveToTarget(Draw());
-                //UpdateDrawPile();
+                if (cd.GetComponent<PhotonView>().IsMine && gameState == eGolfGameState.playing && !disableClicks)
+                {
+                    SendOnDrawEvent("drawpile");
+                    disableClicks = true;
+                }
                 break;
 
             case eGolfCardState.discard:
-                
+                if (cd.GetComponent<PhotonView>().IsMine && gameState == eGolfGameState.playing && !disableClicks)
+                {
+                    SendOnDrawEvent("discardpile");
+                    disableClicks = true;
+                }
                 break;
+        }
+    }
+
+    private void SendOnDrawEvent(string pileName)
+    {
+        RaiseEventOptions raiseEventOptions = new() { Receivers = ReceiverGroup.All };
+        PhotonNetwork.RaiseEvent(onDrawEventCode, pileName, raiseEventOptions, SendOptions.SendReliable);
+        Debug.Log("raise event called");
+    }
+
+    public void SendOnDiscardEvent(string cardName)
+    {
+        RaiseEventOptions raiseEventOptions = new() { Receivers = ReceiverGroup.MasterClient };
+        PhotonNetwork.RaiseEvent(onDiscardEventCode, cardName, raiseEventOptions, SendOptions.SendReliable);
+        Debug.Log("raise event called");
+    }
+
+    public override void OnEnable()
+    {
+        base.OnEnable();
+        PhotonNetwork.NetworkingClient.EventReceived += OnDrawEvent;
+        PhotonNetwork.NetworkingClient.EventReceived += OnDiscardEvent;
+    }
+
+    public override void OnDisable()
+    {
+        base.OnDisable();
+        PhotonNetwork.NetworkingClient.EventReceived -= OnDrawEvent;
+        PhotonNetwork.NetworkingClient.EventReceived -= OnDiscardEvent;
+    }
+
+    private void OnDiscardEvent(EventData photonEvent)
+    {
+        int nextTurn = GetNextTurn();
+        byte eventCode = photonEvent.Code;
+        if (eventCode == onDiscardEventCode && PhotonNetwork.IsMasterClient)
+        {
+            string data = photonEvent.CustomData.ToString();
+            if (data != "hi")
+            {
+                MoveToDiscard(ConvertStringToCard(data));
+            } else
+            {
+                MoveToDiscard(target);
+            }
+            UpdateDiscardPile();
+
+            for (int i = 0; i < playerPMs.Count; i++)
+            {
+                if (currentPlayerTurn == playerPMs[i].actorNum)
+                {
+                    SetPlayerState(playerPMs[i].photonView, "waiting");
+                    Camera.main.gameObject.GetPhotonView().RPC(nameof(AssignTurn), RpcTarget.All, nextTurn);
+                }
+            }
+        }
+    }
+
+    private void OnDrawEvent(EventData photonEvent)
+    {
+        byte eventCode = photonEvent.Code;
+        if (eventCode == onDrawEventCode && PhotonNetwork.IsMasterClient)
+        {
+            string data = photonEvent.CustomData.ToString();
+            print(data);
+
+            for (int i = 0; i < playerPMs.Count; i++)
+            {
+                if (playerPMs[i].actorNum == currentPlayerTurn)
+                {
+                    if (data == "drawpile")
+                    {
+                        SetPlayerState(playerPMs[i].photonView, "deciding");
+                        MoveToTarget(Draw());
+                        UpdateDrawPile();
+                    } else if (data == "discardpile")
+                    {
+                        SetPlayerState(playerPMs[i].photonView, "swapping");
+                        SyncGameState("swapping");
+                        MoveToTarget(DrawFromDiscard());
+                        UpdateDiscardPile();
+                    }
+                }
+            }
         }
     }
 
     void MoveToDiscard(CardGolf cd)
     {
+        discardPile.Add(cd);
+        
         //set state of card to discard
         cd.gameObject.GetPhotonView().RPC("SetCardState", RpcTarget.All, "discard");
-        discardPile.Add(cd);
+
+        int sortOrder = 100 + discardPile.Count;
 
         // position this card on the discardPile
-        cd.gameObject.GetPhotonView().RPC("SetCardProps", RpcTarget.All, new Vector3(1.5f, 0, 0), true);
-
-        // place it on top of the pile for depth sorting
-        cd.SetSortOrder(-100 + discardPile.Count);
+        cd.photonView.RPC("SetCardProps", RpcTarget.All, new Vector3(1.5f, 0, 0), true, sortOrder, "discardpile");
     }
 
-    public void OnTurnBegins(int turn)
+    public void SwapTarget()
     {
-        throw new System.NotImplementedException();
+        if (PhotonNetwork.LocalPlayer.IsMasterClient)
+        {
+
+        }
     }
 
-    public void OnTurnCompleted(int turn)
+    [PunRPC]
+    private void SetTargetCard(string cardName)
     {
-        throw new System.NotImplementedException();
+        CardGolf targetCard = ConvertStringToCard(cardName);
+        target = targetCard;
     }
 
-    public void OnPlayerMove(Player player, int turn, object move)
+    public CardGolf ConvertStringToCard(string name)
     {
-        throw new System.NotImplementedException();
+        return GameObject.Find(name).GetComponent<CardGolf>();
     }
 
-    public void OnPlayerFinished(Player player, int turn, object move)
+    void MoveToTarget(CardGolf cd)
     {
-        throw new System.NotImplementedException();
+        cd.photonView.RPC("SetCardProps", PhotonNetwork.CurrentRoom.GetPlayer(currentPlayerTurn), new Vector3(0, 0, 0), true, 300, "target");
+        this.photonView.RPC(nameof(SetTargetCard), RpcTarget.All, cd.name);
+        cd.photonView.RPC("SetCardState", RpcTarget.All, "target");
     }
 
-    public void OnTurnTimeEnds(int turn)
+    // arranges all the cards of the drawPile to show how many are left
+    void UpdateDrawPile()
     {
-        throw new System.NotImplementedException();
+        print("updating draw pile");
+        CardGolf cd;
+        // go through all the cards of the drawPile
+        for (int i = 0; i < drawPile.Count; i++)
+        {
+            int sortOrder = 10 * i;
+            print("sortOrder: " + sortOrder);
+            cd = drawPile[i];
+            cd.photonView.RPC("SetCardState", RpcTarget.All, "drawpile");
+            cd.photonView.RPC("SetCardProps", RpcTarget.All, new Vector3(-1.5f, 0, 0), false, sortOrder, "drawpile");
+        }
     }
+
+    void UpdateDiscardPile()
+    {
+        print("updating discard pile");
+        CardGolf cd;
+        // go through all cards of discardpile
+        for (int i = 0; i < discardPile.Count; i++)
+        {
+            int sortOrder = 10 * i;
+            cd = discardPile[i];
+            cd.photonView.RPC("SetCardState", RpcTarget.All, "discardpile");
+            cd.photonView.RPC("SetCardProps", RpcTarget.All, new Vector3(1.5f, 0, 0), true, sortOrder, "discardpile");
+        }
+    }
+
+    private void Update()
+    {
+        
+    }
+
+   
 }

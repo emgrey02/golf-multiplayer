@@ -1,14 +1,15 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
+
 
 public enum eGolfPlayerState
 {
     peaking,
     waiting,
-    playing
+    playing,
+    deciding,
+    swapping
 }
 public class PlayerScript : MonoBehaviourPunCallbacks
 {
@@ -29,9 +30,6 @@ public class PlayerScript : MonoBehaviourPunCallbacks
     private void Awake()
     {
         hand = new CardGolf[4];
-        //player = PhotonNetwork.LocalPlayer;
-        //actorNum = player.ActorNumber;
-        //playerGO = this.gameObject;
         playerName = "";
         overlay = GameObject.Find("Canvas").GetComponent<UIOverlay>();
     }
@@ -43,6 +41,7 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         for (int i = 0; i < hand.Length; i++)
         {
             this.hand[i] = ConvertStringToCard(hand[i]);
+            this.hand[i].SetSortingLayerName("Hand");
             
             if (PhotonNetwork.LocalPlayer.IsMasterClient)
             {
@@ -55,10 +54,22 @@ public class PlayerScript : MonoBehaviourPunCallbacks
             CardGolf cardScript = this.hand[i].GetComponent<CardGolf>();
             cardScript.state = eGolfCardState.hand;
 
-            //set player state
-            //state = eGolfPlayerState.peaking;
+
         }
         UpdateUI();
+    }
+
+    [PunRPC]
+    public void UpdateTurnVar()
+    {
+        if (PhotonNetwork.CurrentRoom.CustomProperties["currentTurn"].ToString() == actorNum.ToString())
+        {
+            myTurn = true;
+            state = eGolfPlayerState.playing;
+        } else
+        {
+            myTurn = false;
+        }
     }
 
     [PunRPC]
@@ -105,6 +116,16 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         {
             state = eGolfPlayerState.peaking;
         }
+
+        if (pState == "deciding")
+        {
+            state = eGolfPlayerState.deciding;
+        }
+
+        if (pState == "swapping")
+        {
+            state = eGolfPlayerState.swapping;
+        }
     }
 
     [PunRPC]
@@ -124,20 +145,35 @@ public class PlayerScript : MonoBehaviourPunCallbacks
 
     void UpdateUI()
     {
-        overlay.SetOverlayText(state);
         overlay.ActivateOverlay();
+        overlay.SetOverlayText(state);
     }
 
-    [PunRPC]
     public void SetUIMessage(string m)
     {
         overlay.SetMessage(m);
     }
 
-    [PunRPC]
+   
     public void RemoveMessage()
     {
         overlay.RemoveMessage();
+    }
+
+    public string GetCurrentTurnNickName()
+    {
+        if (PhotonNetwork.CurrentRoom.CustomProperties["currentTurn"] != null)
+        {
+            for (int i = 0; i < PhotonNetwork.PlayerList.Length; i++)
+            {
+                string currentActNum = PhotonNetwork.CurrentRoom.CustomProperties["currentTurn"].ToString(); 
+                if (PhotonNetwork.PlayerList[i].ActorNumber.ToString() == currentActNum)
+                {
+                    return PhotonNetwork.PlayerList[i].NickName;
+                }
+            }
+        }
+        return null;
     }
 
     void Update()
@@ -164,8 +200,44 @@ public class PlayerScript : MonoBehaviourPunCallbacks
             if (messageSet)
             {
                 RemoveMessage();
+                messageSet = false;
+            }
+
+            if (this.photonView.IsMine)
+            {
+                if (myTurn)
+                {
+                    SetUIMessage("Your turn!");
+                } else
+                {
+                    SetUIMessage(GetCurrentTurnNickName() + "'s turn...");
+                }
+            } 
+
+            if (playerGO.GetComponent<PlayerScript>().state == eGolfPlayerState.deciding)
+            {
+                if (this.photonView.IsMine)
+                {
+                    UpdateUI();
+                }
+            }
+
+            if (playerGO.GetComponent<PlayerScript>().state == eGolfPlayerState.waiting && Camera.main.GetComponent<Golf>().gameState == eGolfGameState.playing)
+            {
+                if (this.photonView.IsMine)
+                {
+                    overlay.RemoveOverlay();
+                }
+            }
+        } else if (Camera.main.GetComponent<Golf>().gameState == eGolfGameState.swapping)
+        {
+            if (playerGO.GetComponent<PlayerScript>().state == eGolfPlayerState.swapping)
+            {
+                if (this.photonView.IsMine)
+                {
+                    UpdateUI();
+                }
             }
         }
-
     }
 }

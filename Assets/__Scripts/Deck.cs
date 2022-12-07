@@ -1,5 +1,4 @@
 ﻿using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
 using Photon.Pun;
 using System.Linq;
@@ -268,6 +267,7 @@ public class Deck : MonoBehaviourPunCallbacks {
 	 		// find a random card, add it to shuffled list and remove from original deck
 	 		ndx = Random.Range(0,oCards.Count);
 	 		tCards.Add(oCards[ndx]);
+			oCards[ndx].SetSortingLayerName("drawpile");
 	 		oCards.RemoveAt(ndx);
 	 	}
 
