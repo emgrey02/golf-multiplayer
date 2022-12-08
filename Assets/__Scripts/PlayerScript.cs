@@ -1,7 +1,8 @@
 using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
-
+using System.Collections.Generic;
+using System;
 
 public enum eGolfPlayerState
 {
@@ -32,6 +33,17 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         hand = new CardGolf[4];
         playerName = "";
         overlay = GameObject.Find("Canvas").GetComponent<UIOverlay>();
+    }
+
+    [PunRPC]
+    public void ReplaceCardFromHandWithTarget(string c, string t) {
+        for (int i = 0; i < hand.Length; i++) {
+            if (c == hand[i].name) {
+                CardGolf handCard = ConvertStringToCard(c);
+                int cardIndex = Array.FindIndex(hand, c => c == handCard);
+                hand[cardIndex] = ConvertStringToCard(t);
+            }
+        }
     }
 
     [PunRPC]
@@ -197,12 +209,14 @@ public class PlayerScript : MonoBehaviourPunCallbacks
 
         if (Camera.main.GetComponent<Golf>().gameState == eGolfGameState.playing)
         {
+            //handles beginning peaking message removal
             if (messageSet)
             {
                 RemoveMessage();
                 messageSet = false;
             }
 
+            //turn signifier
             if (this.photonView.IsMine)
             {
                 if (myTurn)
@@ -214,7 +228,8 @@ public class PlayerScript : MonoBehaviourPunCallbacks
                 }
             } 
 
-            if (playerGO.GetComponent<PlayerScript>().state == eGolfPlayerState.deciding)
+            //add UI when player state switches to deciding
+            if (state == eGolfPlayerState.deciding)
             {
                 if (this.photonView.IsMine)
                 {
@@ -222,17 +237,22 @@ public class PlayerScript : MonoBehaviourPunCallbacks
                 }
             }
 
-            if (playerGO.GetComponent<PlayerScript>().state == eGolfPlayerState.waiting && Camera.main.GetComponent<Golf>().gameState == eGolfGameState.playing)
+            //remove UI if player is in waiting state
+            if (state == eGolfPlayerState.waiting && Camera.main.GetComponent<Golf>().gameState == eGolfGameState.playing)
             {
                 if (this.photonView.IsMine)
                 {
                     overlay.RemoveOverlay();
                 }
             }
-        } else if (Camera.main.GetComponent<Golf>().gameState == eGolfGameState.swapping)
+        }
+        
+        if (Camera.main.GetComponent<Golf>().gameState == eGolfGameState.swapping)
         {
-            if (playerGO.GetComponent<PlayerScript>().state == eGolfPlayerState.swapping)
+            //add UI when player and game state are both swapping
+            if (state == eGolfPlayerState.swapping)
             {
+                print("player and game in swapping state");
                 if (this.photonView.IsMine)
                 {
                     UpdateUI();

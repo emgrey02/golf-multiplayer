@@ -49,6 +49,8 @@ public class UIOverlay : MonoBehaviourPunCallbacks
         if (playerState == eGolfPlayerState.swapping)
         {
             title.text = "Choose a card from your hand to swap this with.";
+            swapButton.SetActive(false);
+            discardButton.SetActive(false);
         }
     }
 

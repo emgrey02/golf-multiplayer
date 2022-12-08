@@ -239,7 +239,20 @@ public class Golf : MonoBehaviourPunCallbacks
         if (state == "swapping")
         {
             gameState = eGolfGameState.swapping;
+
+            if (PhotonNetwork.IsMasterClient) 
+            {
+                for (int i = 0; i < playerPMs.Count; i++) {
+                    if (currentPlayerTurn == playerPMs[i].actorNum) {
+                        SetPlayerState(playerPMs[i].photonView, "swapping");
+                    }
+                }
+            }
         }
+    }
+
+    public void SetGameState(string s) {
+        this.photonView.RPC("SyncGameState", RpcTarget.All, s);
     }
 
     //flip that, that that that that that that
@@ -417,6 +430,7 @@ public class Golf : MonoBehaviourPunCallbacks
         return (cd);
     }
 
+    //draws a card from the discard pile and returns it
     public CardGolf DrawFromDiscard()
     {
         CardGolf cd = discardPile[discardPile.Count - 1];
@@ -446,10 +460,12 @@ public class Golf : MonoBehaviourPunCallbacks
                     }
                 }
 
+                //swapping with a card in our hand
                 if (cd.GetComponent<PhotonView>().IsMine && gameState == eGolfGameState.swapping)
                 {
+                    AddTargetToHand(cd);
                     SendOnDiscardEvent(cd.name);
-                    SyncGameState("playing");
+                    SetGameState("playing");
                 }
                 break;
 
@@ -470,6 +486,8 @@ public class Golf : MonoBehaviourPunCallbacks
                 break;
         }
     }
+
+
 
     private void SendOnDrawEvent(string pileName)
     {
@@ -499,6 +517,7 @@ public class Golf : MonoBehaviourPunCallbacks
         PhotonNetwork.NetworkingClient.EventReceived -= OnDiscardEvent;
     }
 
+    //handles discards
     private void OnDiscardEvent(EventData photonEvent)
     {
         int nextTurn = GetNextTurn();
@@ -506,15 +525,19 @@ public class Golf : MonoBehaviourPunCallbacks
         if (eventCode == onDiscardEventCode && PhotonNetwork.IsMasterClient)
         {
             string data = photonEvent.CustomData.ToString();
-            if (data != "hi")
+
+            //if we're discarding a card from our hand (swapping)
+            if (data != "")
             {
                 MoveToDiscard(ConvertStringToCard(data));
             } else
             {
+                //discarding the target card
                 MoveToDiscard(target);
             }
             UpdateDiscardPile();
 
+            //set new player state and assign next turn
             for (int i = 0; i < playerPMs.Count; i++)
             {
                 if (currentPlayerTurn == playerPMs[i].actorNum)
@@ -526,6 +549,7 @@ public class Golf : MonoBehaviourPunCallbacks
         }
     }
 
+    //handles drawing a card
     private void OnDrawEvent(EventData photonEvent)
     {
         byte eventCode = photonEvent.Code;
@@ -546,7 +570,7 @@ public class Golf : MonoBehaviourPunCallbacks
                     } else if (data == "discardpile")
                     {
                         SetPlayerState(playerPMs[i].photonView, "swapping");
-                        SyncGameState("swapping");
+                        SetGameState("swapping");
                         MoveToTarget(DrawFromDiscard());
                         UpdateDiscardPile();
                     }
@@ -557,6 +581,7 @@ public class Golf : MonoBehaviourPunCallbacks
 
     void MoveToDiscard(CardGolf cd)
     {
+        //add card to discard pile
         discardPile.Add(cd);
         
         //set state of card to discard
@@ -568,10 +593,28 @@ public class Golf : MonoBehaviourPunCallbacks
         cd.photonView.RPC("SetCardProps", RpcTarget.All, new Vector3(1.5f, 0, 0), true, sortOrder, "discardpile");
     }
 
-    public void SwapTarget()
+    //adds target card to our hand in correct position
+    //parameter is the card in our hand that we clicked to swap with
+    public void AddTargetToHand(CardGolf cd)
     {
-        if (PhotonNetwork.LocalPlayer.IsMasterClient)
+        if (cd.photonView.IsMine)
         {
+            //get position of card we clicked
+            Vector3 cardPos = cd.gameObject.transform.localPosition;
+
+            target.photonView.RPC("SetCardProps", RpcTarget.All, cardPos, false, 0, "hand");
+
+            //change target card state from target to hand
+            print("changing target card state from target to hand");
+            target.photonView.RPC("SetCardState", RpcTarget.All, "hand");
+
+            for (int i = 0; i < playerPMs.Count; i++) {
+                if (playerPMs[i].actorNum == currentPlayerTurn) {
+                    print("swapping!!!");
+                    playerPMs[i].photonView.RPC("ReplaceCardFromHandWithTarget", RpcTarget.All, cd.name, target.name);
+                    playerPMs[i].photonView.RPC("SyncHand", RpcTarget.All, ConvertHandToStrings(playerPMs[i].hand));
+                }
+            }
 
         }
     }
