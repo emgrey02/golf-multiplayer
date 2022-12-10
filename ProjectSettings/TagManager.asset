@@ -42,10 +42,10 @@ TagManager:
   - name: Default
     uniqueID: 0
     locked: 0
-  - name: drawpile
+  - name: discardpile
     uniqueID: 2286617999
     locked: 0
-  - name: discardpile
+  - name: drawpile
     uniqueID: 720345191
     locked: 0
   - name: hand

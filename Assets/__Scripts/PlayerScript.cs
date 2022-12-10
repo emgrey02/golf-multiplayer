@@ -1,7 +1,6 @@
 using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
-using System.Collections.Generic;
 using System;
 
 public enum eGolfPlayerState
@@ -20,6 +19,8 @@ public class PlayerScript : MonoBehaviourPunCallbacks
     public int actorNum;
     public GameObject playerGO;
 
+    private Quaternion _handRotation;
+
     public bool myTurn;
 
     public UIOverlay overlay;
@@ -27,9 +28,21 @@ public class PlayerScript : MonoBehaviourPunCallbacks
     public eGolfPlayerState state = eGolfPlayerState.waiting;
 
     private bool messageSet = false;
+
+    public Quaternion handRotation {
+        get {
+            return this._handRotation;
+        }
+
+        set {
+            this._handRotation = value;
+            this.transform.rotation = value;
+        }
+    }
     
     private void Awake()
     {
+        handRotation = Quaternion.identity;
         hand = new CardGolf[4];
         playerName = "";
         overlay = GameObject.Find("Canvas").GetComponent<UIOverlay>();
@@ -42,6 +55,7 @@ public class PlayerScript : MonoBehaviourPunCallbacks
                 CardGolf handCard = ConvertStringToCard(c);
                 int cardIndex = Array.FindIndex(hand, c => c == handCard);
                 hand[cardIndex] = ConvertStringToCard(t);
+                hand[cardIndex].transform.rotation = handRotation;
             }
         }
     }
@@ -54,21 +68,12 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         {
             this.hand[i] = ConvertStringToCard(hand[i]);
             this.hand[i].SetSortingLayerName("Hand");
-            
-            if (PhotonNetwork.LocalPlayer.IsMasterClient)
-            {
-                PhotonView cardView = this.hand[i].GetComponent<PhotonView>();
-                
-                cardView.TransferOwnership(player);
-            }
+            this.hand[i].owner = this.actorNum;
 
             //sync card state
             CardGolf cardScript = this.hand[i].GetComponent<CardGolf>();
             cardScript.state = eGolfCardState.hand;
-
-
         }
-        UpdateUI();
     }
 
     [PunRPC]
@@ -93,21 +98,27 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         this.playerGO = this.gameObject;
     }
 
-    [PunRPC]
-    public void RotateCards(Quaternion pos)
+   
+    public void RotateHand(Quaternion pos)
     {
         for (int i = 0; i < 4; i++)
         {
             this.hand[i].transform.rotation = pos;
         }
+        this.photonView.RPC(nameof(SetHandRotation), RpcTarget.All, pos);
     }
 
     [PunRPC]
-    public void SyncHandPOS(Vector3[] pos)
+    private void SetHandRotation(Quaternion rot) 
+    {
+        this.handRotation = rot;
+    }
+
+    public void PositionHand(Vector3[] pos)
     {
         for (int i = 0; i < 4; i++)
         {
-            this.hand[i].transform.position = pos[i];
+            this.hand[i].transform.localPosition = pos[i];
         }
     }
 
@@ -127,6 +138,7 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         if (pState == "peaking")
         {
             state = eGolfPlayerState.peaking;
+            UpdateUI();
         }
 
         if (pState == "deciding")
@@ -197,7 +209,7 @@ public class PlayerScript : MonoBehaviourPunCallbacks
             //and message hasn't been set
             if (state == eGolfPlayerState.waiting && !messageSet)
             {
-                if (playerGO.GetPhotonView().IsMine)
+                if (this.photonView.IsMine)
                 {
                     //activate the UI message element
                     SetUIMessage("waiting for other players...");
@@ -252,7 +264,6 @@ public class PlayerScript : MonoBehaviourPunCallbacks
             //add UI when player and game state are both swapping
             if (state == eGolfPlayerState.swapping)
             {
-                print("player and game in swapping state");
                 if (this.photonView.IsMine)
                 {
                     UpdateUI();

@@ -1,6 +1,4 @@
 using Photon.Pun;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 // an enum defines a variable type with a few prenamed values
@@ -27,6 +25,30 @@ public class CardGolf : Card
         base.OnMouseUpAsButton();
     }
 
+    private Vector3 _pos;
+
+    public int owner;
+
+    public Vector3 pos {
+		get {
+			return this._pos;
+		}
+
+		set {
+			this._pos = value;
+        }
+	}
+
+    [PunRPC]
+    public void SetOwner(int actorNum) {
+        this.owner = actorNum;
+    }
+
+    [PunRPC]
+    public void SetCardPos(Vector3 p) {
+        this.pos = p;
+    }
+
     [PunRPC]
     public void SetCardState(string s)
     {
@@ -49,9 +71,8 @@ public class CardGolf : Card
     }
 
     [PunRPC]
-    public void SetCardProps(Vector3 pos, bool faceUp, int sortOrder, string sortName)
+    public void SetCardProps(bool faceUp, int sortOrder, string sortName)
     {
-        this.transform.localPosition = pos;
         this.faceUp = faceUp;
         this.SetSortOrder(sortOrder);
         this.SetSortingLayerName(sortName);
