@@ -21,13 +21,16 @@ public class PlayerScript : MonoBehaviourPunCallbacks
 
     private Quaternion _handRotation;
 
+    public bool lastTurn = false;
+
     public bool myTurn;
 
+    public GameObject canvasGO;
     public UIOverlay overlay;
 
     public eGolfPlayerState state = eGolfPlayerState.waiting;
 
-    private bool messageSet = false;
+    public bool messageSet = false;
 
     public Quaternion handRotation {
         get {
@@ -45,9 +48,23 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         handRotation = Quaternion.identity;
         hand = new CardGolf[4];
         playerName = "";
-        overlay = GameObject.Find("Canvas").GetComponent<UIOverlay>();
+        canvasGO = PhotonView.Find(3).gameObject;
+        overlay = canvasGO.GetComponent<UIOverlay>();
     }
 
+    //these refs don't hold after the scene is reloaded
+    //assigning them afterwards fixes the issue
+    [PunRPC]
+    public void UpdateOverlayField()
+    {
+        canvasGO = PhotonView.Find(3).gameObject;
+        overlay = canvasGO.GetComponent<UIOverlay>();
+    }
+
+    //RPC
+    //When swapping, we replace a card from our hand with the target card
+    //sent as strings bc we can't send them as gameObjects across the network
+    //we put it in the correct index
     [PunRPC]
     public void ReplaceCardFromHandWithTarget(string c, string t) {
         for (int i = 0; i < hand.Length; i++) {
@@ -60,6 +77,9 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         }
     }
 
+    //RPC
+    //set this playerscript's hand according to an array of card names (an array of strings)
+    //syncs on every client
     [PunRPC]
     public void SyncHand(string[] hand)
     {
@@ -76,6 +96,8 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         }
     }
 
+    //RPC
+    //sets every player's myTurn field according to current player turn
     [PunRPC]
     public void UpdateTurnVar()
     {
@@ -89,6 +111,8 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         }
     }
 
+    //RPC
+    //sync player props on every client
     [PunRPC]
     public void SyncPlayer(string name, Player player, int actNum)
     {
@@ -98,7 +122,7 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         this.playerGO = this.gameObject;
     }
 
-   
+   //rotate this player's hand + sends RPC to sync it
     public void RotateHand(Quaternion pos)
     {
         for (int i = 0; i < 4; i++)
@@ -108,12 +132,15 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         this.photonView.RPC(nameof(SetHandRotation), RpcTarget.All, pos);
     }
 
+    //RPC
+    //syncs player's hand rotation (on every client)
     [PunRPC]
     private void SetHandRotation(Quaternion rot) 
     {
         this.handRotation = rot;
     }
 
+    //position this player's hand
     public void PositionHand(Vector3[] pos)
     {
         for (int i = 0; i < 4; i++)
@@ -122,6 +149,8 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         }
     }
 
+    //RPC
+    //Set this player's state (called on every client so it's synced)
     [PunRPC]
     public void SyncPlayerState(string pState)
     {
@@ -152,38 +181,44 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         }
     }
 
+    //RPC
+    //flips this player's hand face up or face down
     [PunRPC]
-    public void ResetHand()
+    public void FlipHand(bool fu)
     {
         for (int i = 0; i < 4; i++)
         {
-            this.hand[i].faceUp = false;
+            this.hand[i].faceUp = fu;
         }
     }
 
+    //convert the name of a card (string) into the card itself (CardGolf)
     public CardGolf ConvertStringToCard(string name)
     {
         print(name);
         return GameObject.Find(name).GetComponent<CardGolf>();
     }
 
+    //activate overlay and set the text
     void UpdateUI()
     {
         overlay.ActivateOverlay();
         overlay.SetOverlayText(state);
     }
 
+    //set message in upper left corner
     public void SetUIMessage(string m)
     {
         overlay.SetMessage(m);
     }
 
-   
+    //remove text in upper left corner
     public void RemoveMessage()
     {
         overlay.RemoveMessage();
     }
 
+    //get nickname from actor number of current turn
     public string GetCurrentTurnNickName()
     {
         if (PhotonNetwork.CurrentRoom.CustomProperties["currentTurn"] != null)
@@ -205,10 +240,12 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         //is game state is peaking
         if (Camera.main.GetComponent<Golf>().gameState == eGolfGameState.peaking) 
         {
+            overlay.DeactivateRoundOver();
             //and player state is waiting (meaning, they are done peaking)
             //and message hasn't been set
             if (state == eGolfPlayerState.waiting && !messageSet)
             {
+                //only show on THIS player's screen 
                 if (this.photonView.IsMine)
                 {
                     //activate the UI message element
@@ -216,9 +253,18 @@ public class PlayerScript : MonoBehaviourPunCallbacks
                     messageSet = true;
                 }
             }
-
         }
 
+        //give this player option to knock
+        //when their player state is playing and it isn't the last turn (no one has knocked yet)
+        if (state == eGolfPlayerState.playing && !lastTurn) 
+        {
+            if (this.photonView.IsMine) {
+                overlay.RevealKnockButton();
+            }
+        }
+
+        //gamestate is playing
         if (Camera.main.GetComponent<Golf>().gameState == eGolfGameState.playing)
         {
             //handles beginning peaking message removal
@@ -250,25 +296,59 @@ public class PlayerScript : MonoBehaviourPunCallbacks
             }
 
             //remove UI if player is in waiting state
-            if (state == eGolfPlayerState.waiting && Camera.main.GetComponent<Golf>().gameState == eGolfGameState.playing)
+            if (state == eGolfPlayerState.waiting)
             {
                 if (this.photonView.IsMine)
                 {
                     overlay.RemoveOverlay();
+                    overlay.RemoveKnockButton();
                 }
             }
         }
         
+        //if gamestate is swapping
         if (Camera.main.GetComponent<Golf>().gameState == eGolfGameState.swapping)
         {
             //add UI when player and game state are both swapping
             if (state == eGolfPlayerState.swapping)
             {
+                
                 if (this.photonView.IsMine)
                 {
                     UpdateUI();
                 }
             }
+        }
+        
+        //remove knock button and set lastTurn variable for this PlayerScript
+        //when it's this playerscript's turn and it's their last turn bc a player knocked
+        if (myTurn && Camera.main.GetComponent<Golf>().lastTurns) 
+        {
+            overlay.RemoveKnockButton();
+            if (!this.lastTurn) 
+            {
+                this.lastTurn = true;
+            }
+        } 
+        
+        //do ui stuff when game state is set to roundover
+        if (Camera.main.gameObject.GetComponent<Golf>().gameState == eGolfGameState.roundover) 
+        {
+            print("game state is roundover");
+            overlay.RemoveOverlay();
+            overlay.ActivateRoundOver();
+            overlay.RemoveMessage();
+            Camera.main.gameObject.GetComponent<Golf>().FlipCards(true);
+
+            if (state == eGolfPlayerState.waiting) 
+            {   
+                if (this.photonView.IsMine) 
+                {
+                    SetUIMessage("waiting to go to next round...");
+                }
+            }
+            
+            
         }
     }
 }

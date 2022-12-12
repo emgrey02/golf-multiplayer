@@ -199,6 +199,9 @@ MonoBehaviour:
   playerName: 
   actorNum: 0
   playerGO: {fileID: 0}
+  lastTurn: 0
   myTurn: 0
+  canvasGO: {fileID: 0}
   overlay: {fileID: 0}
   state: 1
+  messageSet: 0

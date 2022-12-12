@@ -1,6 +1,4 @@
 using Photon.Pun;
-using System.Collections;
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
@@ -11,20 +9,30 @@ public class UIOverlay : MonoBehaviourPunCallbacks
 
     private TextMeshProUGUI message;
 
-    public GameObject donePeakingButton;
-    public GameObject swapButton;
-    public GameObject discardButton;
+    private GameObject donePeakingButton;
+    private GameObject swapButton;
+    private GameObject discardButton;
+    private GameObject knockButton;
+    private GameObject RoundOver;
+    private GameObject NextRoundButton;
+    private GameObject Scoreboard;
 
     private void Awake()
     {
+        //PhotonView.DontDestroyOnLoad(gameObject);
         overlay = gameObject.transform.GetChild(0).gameObject;
         title = overlay.transform.GetChild(0).GetComponent<TextMeshProUGUI>();
-        message = gameObject.transform.GetChild(1).GetComponent<TextMeshProUGUI>();
-        message.text = "";
-
+        
         donePeakingButton = overlay.transform.GetChild(1).gameObject;
         swapButton = overlay.transform.GetChild(2).gameObject;
         discardButton = overlay.transform.GetChild(3).gameObject;
+
+        message = gameObject.transform.GetChild(1).GetComponent<TextMeshProUGUI>();
+        message.text = "";
+        knockButton = gameObject.transform.GetChild(2).gameObject;
+        RoundOver = gameObject.transform.GetChild(3).gameObject;
+        Scoreboard = gameObject.transform.GetChild(4).gameObject;
+        NextRoundButton = gameObject.transform.GetChild(5).gameObject;
 
         DeactivateButtons();
         overlay.SetActive(false);
@@ -44,6 +52,7 @@ public class UIOverlay : MonoBehaviourPunCallbacks
             title.text = "Discard, or swap with a card in your hand.";
             swapButton.SetActive(true);
             discardButton.SetActive(true);
+            knockButton.SetActive(false);
         }
 
         if (playerState == eGolfPlayerState.swapping)
@@ -51,6 +60,7 @@ public class UIOverlay : MonoBehaviourPunCallbacks
             title.text = "Choose a card from your hand to swap this with.";
             swapButton.SetActive(false);
             discardButton.SetActive(false);
+            knockButton.SetActive(false);
         }
     }
 
@@ -61,7 +71,6 @@ public class UIOverlay : MonoBehaviourPunCallbacks
 
     public void RemoveOverlay()
     {
-        Debug.Log("removing overlay");
         title.text = "";
         overlay.SetActive(false);
         DeactivateButtons();
@@ -72,6 +81,7 @@ public class UIOverlay : MonoBehaviourPunCallbacks
         donePeakingButton.SetActive(false);
         swapButton.SetActive(false);
         discardButton.SetActive(false);
+        knockButton.SetActive(false);
     }
 
     public void SetMessage(string m)
@@ -85,15 +95,34 @@ public class UIOverlay : MonoBehaviourPunCallbacks
         message.gameObject.SetActive(false);
     }
 
-    // Start is called before the first frame update
-    void Start()
+    public void RevealKnockButton() 
     {
-        
+        knockButton.SetActive(true);
+    }
+
+    public void RemoveKnockButton()
+    {
+        knockButton.SetActive(false);
+    }
+
+    public void ActivateRoundOver()
+    {
+        RoundOver.SetActive(true);
+
+        if (PhotonNetwork.IsMasterClient) {
+            NextRoundButton.SetActive(true);
+        }
+    }
+
+    public void DeactivateRoundOver()
+    {
+        RoundOver.SetActive(false);
+        NextRoundButton.SetActive(false);
     }
 
     // Update is called once per frame
     void Update()
     {
-         
+        
     }
 }
