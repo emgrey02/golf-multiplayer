@@ -31,6 +31,7 @@ public class PlayerScript : MonoBehaviourPunCallbacks
     public eGolfPlayerState state = eGolfPlayerState.waiting;
 
     public bool messageSet = false;
+    public bool roundEndMessageSet = false;
 
     public Quaternion handRotation {
         get {
@@ -55,10 +56,13 @@ public class PlayerScript : MonoBehaviourPunCallbacks
     //these refs don't hold after the scene is reloaded
     //assigning them afterwards fixes the issue
     [PunRPC]
-    public void UpdateOverlayField()
+    public void ResetPlayerFields()
     {
         canvasGO = PhotonView.Find(3).gameObject;
         overlay = canvasGO.GetComponent<UIOverlay>();
+        myTurn = false;
+        lastTurn = false;
+        messageSet = false;
     }
 
     //RPC
@@ -83,7 +87,7 @@ public class PlayerScript : MonoBehaviourPunCallbacks
     [PunRPC]
     public void SyncHand(string[] hand)
     {
-        print("PLAYER " + playerName + "'s hand: ");
+        //print("PLAYER " + playerName + "'s hand: ");
         for (int i = 0; i < hand.Length; i++)
         {
             this.hand[i] = ConvertStringToCard(hand[i]);
@@ -154,6 +158,7 @@ public class PlayerScript : MonoBehaviourPunCallbacks
     [PunRPC]
     public void SyncPlayerState(string pState)
     {
+        print("setting player state to " + pState);
         if (pState == "waiting")
         {
             state = eGolfPlayerState.waiting;
@@ -195,7 +200,7 @@ public class PlayerScript : MonoBehaviourPunCallbacks
     //convert the name of a card (string) into the card itself (CardGolf)
     public CardGolf ConvertStringToCard(string name)
     {
-        print(name);
+        //print(name);
         return GameObject.Find(name).GetComponent<CardGolf>();
     }
 
@@ -240,6 +245,11 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         //is game state is peaking
         if (Camera.main.GetComponent<Golf>().gameState == eGolfGameState.peaking) 
         {
+            if (roundEndMessageSet) 
+            {
+                RemoveMessage();
+                roundEndMessageSet = false;
+            }
             overlay.DeactivateRoundOver();
             //and player state is waiting (meaning, they are done peaking)
             //and message hasn't been set
@@ -332,9 +342,8 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         } 
         
         //do ui stuff when game state is set to roundover
-        if (Camera.main.gameObject.GetComponent<Golf>().gameState == eGolfGameState.roundover) 
+        if (Camera.main.gameObject.GetComponent<Golf>().gameState == eGolfGameState.roundover && !roundEndMessageSet) 
         {
-            print("game state is roundover");
             overlay.RemoveOverlay();
             overlay.ActivateRoundOver();
             overlay.RemoveMessage();
@@ -347,8 +356,8 @@ public class PlayerScript : MonoBehaviourPunCallbacks
                     SetUIMessage("waiting to go to next round...");
                 }
             }
-            
-            
+
+            roundEndMessageSet = true;
         }
     }
 }

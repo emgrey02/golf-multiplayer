@@ -561,7 +561,7 @@ RectTransform:
   m_Children:
   - {fileID: 628943452}
   m_Father: {fileID: 1997411673}
-  m_RootOrder: 2
+  m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
@@ -1728,7 +1728,7 @@ RectTransform:
   - {fileID: 1013654606}
   - {fileID: 1876409875}
   m_Father: {fileID: 1997411673}
-  m_RootOrder: 4
+  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
@@ -1819,10 +1819,7 @@ MonoBehaviour:
   p3Total: {fileID: 2035305386}
   p4Total: {fileID: 189068968}
   roundNum: {fileID: 1407018315}
-  g: {fileID: 0}
-  scoresList: 
-  namesList: []
-  scoresOnBoardList: []
+  _roundNum: 0
 --- !u!114 &701308517
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2212,7 +2209,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1997411673}
-  m_RootOrder: 1
+  m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
@@ -2418,7 +2415,7 @@ RectTransform:
   - {fileID: 1882856052}
   - {fileID: 1855713714}
   m_Father: {fileID: 1997411673}
-  m_RootOrder: 0
+  m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
@@ -2764,7 +2761,7 @@ RectTransform:
   - {fileID: 1633184299}
   - {fileID: 62510232}
   m_Father: {fileID: 1997411673}
-  m_RootOrder: 3
+  m_RootOrder: 4
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
@@ -3680,11 +3677,11 @@ RectTransform:
   m_LocalScale: {x: 0.052122843, y: 0.052122843, z: 0.052122843}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 701308512}
   - {fileID: 1334102304}
   - {fileID: 1060973968}
   - {fileID: 201319382}
   - {fileID: 1628979332}
-  - {fileID: 701308512}
   - {fileID: 535379813}
   m_Father: {fileID: 0}
   m_RootOrder: 1
@@ -3706,14 +3703,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 71bd0c5959214ee438ad660d7d7676dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  overlay: {fileID: 1334102303}
-  donePeakingButton: {fileID: 3499748137137699202}
-  swapButton: {fileID: 1882856051}
-  discardButton: {fileID: 1855713713}
-  knockButton: {fileID: 201319381}
-  RoundOver: {fileID: 1628979331}
-  NextRoundButton: {fileID: 535379812}
-  Scoreboard: {fileID: 701308511}
 --- !u!114 &1997411675
 MonoBehaviour:
   m_ObjectHideFlags: 0

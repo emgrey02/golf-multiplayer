@@ -205,3 +205,4 @@ MonoBehaviour:
   overlay: {fileID: 0}
   state: 1
   messageSet: 0
+  roundEndMessageSet: 0

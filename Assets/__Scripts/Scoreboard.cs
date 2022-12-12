@@ -5,7 +5,6 @@ using UnityEngine;
 
 public class Scoreboard : MonoBehaviourPunCallbacks
 {
-    [SerializeField]
     public GameObject scoreboard;
 
     public TextMeshProUGUI p1Name;
@@ -19,17 +18,18 @@ public class Scoreboard : MonoBehaviourPunCallbacks
     public TextMeshProUGUI p4Total;
     public TextMeshProUGUI roundNum;
 
-    public Golf g;
-
+    [SerializeField]
     private int _roundNum;
     public static int P1_SCORE;
     public static int P2_SCORE;
     public static int P3_SCORE;
     public static int P4_SCORE;
 
-    public static List<int> SCORES;
-    public List<TextMeshProUGUI> namesList;
-    public List<TextMeshProUGUI> scoresOnBoardList;
+    [SerializeField]
+    public static List<int> SCORES = new List<int> { P1_SCORE, P2_SCORE, P3_SCORE, P4_SCORE };
+
+    private List<TextMeshProUGUI> namesList;
+    private List<TextMeshProUGUI> scoresOnBoardList;
 
     public int RoundNum {
         get 
@@ -45,7 +45,6 @@ public class Scoreboard : MonoBehaviourPunCallbacks
 
     void Awake()
     {
-        SCORES = new List<int> { P1_SCORE, P2_SCORE, P3_SCORE, P4_SCORE };
         namesList = new List<TextMeshProUGUI> { p1Name, p2Name, p3Name, p4Name };
         scoresOnBoardList = new List<TextMeshProUGUI> { p1Total, p2Total, p3Total, p4Total };
     }
@@ -63,32 +62,38 @@ public class Scoreboard : MonoBehaviourPunCallbacks
     }
 
     [PunRPC]
-    public void TallyScores(string pName, string[] hand) {
-        int playerScore = 0;
-        for (int i = 0; i < namesList.Count; i++) {
-            if (pName == namesList[i].text) {
-                playerScore = SCORES[i];
+    public void TallyScores(string pName, string[] hand) 
+    {
+        for (int i = 0; i < namesList.Count; i++) 
+        {
+            if (pName == namesList[i].text) 
+            {
                 SCORES[i] += CalculateScore(hand);
                 scoresOnBoardList[i].text = SCORES[i].ToString();
             }
         }
     }
 
-    private int CalculateScore(string[] hand) {
+    private int CalculateScore(string[] hand) 
+    {
         int totalScore = 0;
-        for (int i = 0; i < hand.Length; i++) {
+
+        for (int i = 0; i < hand.Length; i++) 
+        {
             int score;
 
             //get just the number from the card name
             int.TryParse(hand[i].Substring(1), out score);
 
             //jack and queens are 10
-            if (score == 11 || score == 12) {
+            if (score == 11 || score == 12) 
+            {
                 score = 10;
             }
 
             //kings are 0
-            if (score == 13) {
+            if (score == 13) 
+            {
                 score = 0;
             }
 

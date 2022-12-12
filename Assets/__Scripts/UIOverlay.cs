@@ -19,19 +19,19 @@ public class UIOverlay : MonoBehaviourPunCallbacks
 
     private void Awake()
     {
-        //PhotonView.DontDestroyOnLoad(gameObject);
-        overlay = gameObject.transform.GetChild(0).gameObject;
+        Scoreboard = gameObject.transform.GetChild(0).gameObject;
+
+        overlay = gameObject.transform.GetChild(1).gameObject;
+
         title = overlay.transform.GetChild(0).GetComponent<TextMeshProUGUI>();
-        
         donePeakingButton = overlay.transform.GetChild(1).gameObject;
         swapButton = overlay.transform.GetChild(2).gameObject;
         discardButton = overlay.transform.GetChild(3).gameObject;
 
-        message = gameObject.transform.GetChild(1).GetComponent<TextMeshProUGUI>();
+        message = gameObject.transform.GetChild(2).GetComponent<TextMeshProUGUI>();
         message.text = "";
-        knockButton = gameObject.transform.GetChild(2).gameObject;
-        RoundOver = gameObject.transform.GetChild(3).gameObject;
-        Scoreboard = gameObject.transform.GetChild(4).gameObject;
+        knockButton = gameObject.transform.GetChild(3).gameObject;
+        RoundOver = gameObject.transform.GetChild(4).gameObject;
         NextRoundButton = gameObject.transform.GetChild(5).gameObject;
 
         DeactivateButtons();

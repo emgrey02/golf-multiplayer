@@ -34,7 +34,7 @@ public class Golf : MonoBehaviourPunCallbacks
 
     public static int ROUND_NUM;
 
-    public bool lastTurns = false;
+    public bool lastTurns;
 
     private List<GameObject> playerGOs;
     private List<PlayerScript> playerPMs;
@@ -44,9 +44,9 @@ public class Golf : MonoBehaviourPunCallbacks
     OnPositionChange moveCard;
 
     private const int maxPeaks = 2;
-    private int peakCount = 0;
+    public int peakCount;
 
-    private bool disableClicks = false;
+    private bool disableClicks;
 
     public const byte onDrawEventCode = 1;
     public const byte onDiscardEventCode = 2;
@@ -62,6 +62,7 @@ public class Golf : MonoBehaviourPunCallbacks
 
     private void Awake()
     {
+        this.photonView.RPC("UpdateFieldsOnNewRound", RpcTarget.All);
         playerGOs = new List<GameObject>();
         playerPMs = new List<PlayerScript>();
         playerNames = new List<string>();
@@ -110,8 +111,8 @@ public class Golf : MonoBehaviourPunCallbacks
             PositionCards();
 
             //starts first stage of game
-            ChangePlayerStates("peaking");
             SetGameState("peaking");
+            ChangePlayerStates("peaking");
         } else
         {
             //everyone else's camera rotates so their own hand is in front of them
@@ -130,10 +131,18 @@ public class Golf : MonoBehaviourPunCallbacks
     {
         if (PhotonNetwork.IsMasterClient) 
         {
-            ResetCustProps();
-            PhotonNetwork.LoadLevel("Game");
+            LoadNextRound();
         }
     }
+
+    [PunRPC]
+    public void UpdateFieldsOnNewRound()
+    {
+        this.lastTurns = false;
+        this.disableClicks = false;
+        this.peakCount = 0;
+    }
+
 
     //RPC
     //syncs the lastTurns field on every client
@@ -168,6 +177,7 @@ public class Golf : MonoBehaviourPunCallbacks
     }
 
     public void ResetCustProps() {
+        print("resetting custom props");
         Hashtable custProps = new Hashtable();
         custProps.Add("Peak", "not done");
 
@@ -213,13 +223,20 @@ public class Golf : MonoBehaviourPunCallbacks
         }
     }
 
+    public void LoadNextRound()
+    {
+            PhotonNetwork.LoadLevel("Game");
+    }
+
     //only master client uses this method
     private void CheckForEndPeakingState()
     {
         //time to check player custom props and get a list of
         //players who are done peaking
         List<PlayerScript> playersDonePeaking = new List<PlayerScript>();
+        
         int count = 0;
+        
         for (int i = 0; i < playerGOs.Count; i++)
         {
             object PeakProp = PhotonNetwork.PlayerList[i].CustomProperties["Peak"];
@@ -294,6 +311,8 @@ public class Golf : MonoBehaviourPunCallbacks
     [PunRPC]
     public void SyncGameState(string state)
     {
+        print("changing game state to " + state);
+
         if (state == "setup") 
         {
             gameState = eGolfGameState.setup;
@@ -360,10 +379,9 @@ public class Golf : MonoBehaviourPunCallbacks
     {
         if (PhotonNetwork.LocalPlayer.IsMasterClient)
         {
-            print("changing player states to " + pState);
             for (int i = 0; i < playerPMs.Count; i++)
             {
-                playerPMs[i].photonView.RPC("SyncPlayerState", RpcTarget.All, pState);
+                SetPlayerState(playerPMs[i].photonView, pState);
             }
         }
     }
@@ -382,7 +400,7 @@ public class Golf : MonoBehaviourPunCallbacks
         deckCards = deck.GetCards(deckGO);
         Deck.Shuffle(ref deckCards);
         drawPile = ConvertListCardsToListCardGolfs(deckCards);
-        //UpdateDrawPile();
+        UpdateDrawPile();
     }
 
     //every client other than master client calls this
@@ -425,7 +443,7 @@ public class Golf : MonoBehaviourPunCallbacks
 
             if (ROUND_NUM > 1) 
             {
-                playerPMs[i].photonView.RPC("UpdateOverlayField", RpcTarget.All);
+                playerPMs[i].photonView.RPC("ResetPlayerFields", RpcTarget.All);
             }
 
             //populate scoreboard
@@ -664,6 +682,11 @@ public class Golf : MonoBehaviourPunCallbacks
                             
                             //so we can spawn button only on Master Client's screen
                             SetPlayerState(playerPMs[0].photonView, "playing");
+
+                            //reset cust props for next round
+                            ResetCustProps();
+
+                            //round is over, tally scores
                             PostScores();
                         } else 
                         {
@@ -819,7 +842,7 @@ public class Golf : MonoBehaviourPunCallbacks
     //arranges all the cards of the drawPile
     //sets position
     //calls RPCs
-    //card state and props synced on every client
+    //card state,props, and owner synced on every client
     void UpdateDrawPile()
     {
         CardGolf cd;
@@ -832,6 +855,7 @@ public class Golf : MonoBehaviourPunCallbacks
             cd.photonView.RPC("SetCardState", RpcTarget.All, "drawpile");
             cd.photonView.transform.localPosition = new Vector3(-1.5f, 0, 0);
             cd.photonView.RPC("SetCardProps", RpcTarget.All, false, sortOrder, "drawpile");
+            cd.photonView.RPC("SetOwner", RpcTarget.All, 0);
         }
     }
 
@@ -839,7 +863,7 @@ public class Golf : MonoBehaviourPunCallbacks
     //sets position
     //sets rotation
     //calls RPCs
-    //card state, card props synced on every client
+    //card state, card props, card owner synced on every client
     void UpdateDiscardPile()
     {
         CardGolf cd;
@@ -853,6 +877,7 @@ public class Golf : MonoBehaviourPunCallbacks
             moveCard(cd, new Vector3(1.5f, 0, 0));
             cd.photonView.transform.rotation = Quaternion.identity;
             cd.photonView.RPC("SetCardProps", RpcTarget.All, true, sortOrder, "discardpile");
+            cd.photonView.RPC("SetOwner", RpcTarget.All, 0);
         }
     }   
 }
