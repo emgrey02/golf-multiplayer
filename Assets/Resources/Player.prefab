@@ -203,6 +203,7 @@ MonoBehaviour:
   myTurn: 0
   canvasGO: {fileID: 0}
   overlay: {fileID: 0}
+  g: {fileID: 0}
   state: 1
   messageSet: 0
   roundEndMessageSet: 0

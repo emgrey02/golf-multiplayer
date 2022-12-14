@@ -8,6 +8,7 @@ public class UIOverlay : MonoBehaviourPunCallbacks
     private TextMeshProUGUI title;
 
     private TextMeshProUGUI message;
+    private TextMeshProUGUI knockMessage;
 
     private GameObject donePeakingButton;
     private GameObject swapButton;
@@ -16,6 +17,7 @@ public class UIOverlay : MonoBehaviourPunCallbacks
     private GameObject RoundOver;
     private GameObject NextRoundButton;
     private GameObject Scoreboard;
+    private GameObject GameOverPanel;
 
     private void Awake()
     {
@@ -33,6 +35,9 @@ public class UIOverlay : MonoBehaviourPunCallbacks
         knockButton = gameObject.transform.GetChild(3).gameObject;
         RoundOver = gameObject.transform.GetChild(4).gameObject;
         NextRoundButton = gameObject.transform.GetChild(5).gameObject;
+        GameOverPanel = gameObject.transform.GetChild(6).gameObject;
+
+        knockMessage = gameObject.transform.GetChild(7).GetComponent<TextMeshProUGUI>();
 
         DeactivateButtons();
         overlay.SetActive(false);
@@ -62,6 +67,24 @@ public class UIOverlay : MonoBehaviourPunCallbacks
             discardButton.SetActive(false);
             knockButton.SetActive(false);
         }
+    }
+
+    public void SetKnockMessage(string name)
+    {
+        knockMessage.gameObject.SetActive(true);
+        knockMessage.text = name + " knocked!!";
+    }
+
+    public void RemoveKnockMessage()
+    {
+        knockMessage.text = "";
+        knockMessage.gameObject.SetActive(false);
+    }
+
+    public void TriggerGameOverDisplay()
+    {
+        GameOverPanel.SetActive(true);
+        Scoreboard.transform.localPosition = new Vector3(0, 0, 0);
     }
 
     public void ActivateOverlay()

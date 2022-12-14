@@ -27,6 +27,7 @@ public class PlayerScript : MonoBehaviourPunCallbacks
 
     public GameObject canvasGO;
     public UIOverlay overlay;
+    public Golf g;
 
     public eGolfPlayerState state = eGolfPlayerState.waiting;
 
@@ -51,6 +52,7 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         playerName = "";
         canvasGO = PhotonView.Find(3).gameObject;
         overlay = canvasGO.GetComponent<UIOverlay>();
+        g = Camera.main.gameObject.GetComponent<Golf>();
     }
 
     //these refs don't hold after the scene is reloaded
@@ -60,9 +62,12 @@ public class PlayerScript : MonoBehaviourPunCallbacks
     {
         canvasGO = PhotonView.Find(3).gameObject;
         overlay = canvasGO.GetComponent<UIOverlay>();
+        g = Camera.main.gameObject.GetComponent<Golf>();
+        overlay.RemoveMessage();
         myTurn = false;
         lastTurn = false;
         messageSet = false;
+        roundEndMessageSet = false;
     }
 
     //RPC
@@ -76,7 +81,8 @@ public class PlayerScript : MonoBehaviourPunCallbacks
                 CardGolf handCard = ConvertStringToCard(c);
                 int cardIndex = Array.FindIndex(hand, c => c == handCard);
                 hand[cardIndex] = ConvertStringToCard(t);
-                hand[cardIndex].transform.rotation = handRotation;
+                hand[cardIndex].transform.localRotation = handRotation;
+                hand[cardIndex].transform.localScale = new Vector3(1, 1, 1);
             }
         }
     }
@@ -131,7 +137,7 @@ public class PlayerScript : MonoBehaviourPunCallbacks
     {
         for (int i = 0; i < 4; i++)
         {
-            this.hand[i].transform.rotation = pos;
+            this.hand[i].transform.localRotation = pos;
         }
         this.photonView.RPC(nameof(SetHandRotation), RpcTarget.All, pos);
     }
@@ -243,14 +249,16 @@ public class PlayerScript : MonoBehaviourPunCallbacks
     void Update()
     {
         //is game state is peaking
-        if (Camera.main.GetComponent<Golf>().gameState == eGolfGameState.peaking) 
+        if (g.gameState == eGolfGameState.peaking) 
         {
             if (roundEndMessageSet) 
             {
                 RemoveMessage();
                 roundEndMessageSet = false;
             }
+
             overlay.DeactivateRoundOver();
+
             //and player state is waiting (meaning, they are done peaking)
             //and message hasn't been set
             if (state == eGolfPlayerState.waiting && !messageSet)
@@ -274,8 +282,26 @@ public class PlayerScript : MonoBehaviourPunCallbacks
             }
         }
 
+        //it's the last turn and someone has knocked
+        if (g.lastTurns)
+        {
+            //spawn ui to show someone has knocked
+            if (this.photonView.IsMine)
+            {
+                if (g.whoKnocked == this.playerName)
+                {
+                    overlay.SetKnockMessage("You");
+                } else
+                {
+                    overlay.SetKnockMessage(g.whoKnocked);
+                }
+
+            }
+            
+        }
+
         //gamestate is playing
-        if (Camera.main.GetComponent<Golf>().gameState == eGolfGameState.playing)
+        if (g.gameState == eGolfGameState.playing)
         {
             //handles beginning peaking message removal
             if (messageSet)
@@ -317,12 +343,11 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         }
         
         //if gamestate is swapping
-        if (Camera.main.GetComponent<Golf>().gameState == eGolfGameState.swapping)
+        if (g.gameState == eGolfGameState.swapping)
         {
             //add UI when player and game state are both swapping
             if (state == eGolfPlayerState.swapping)
             {
-                
                 if (this.photonView.IsMine)
                 {
                     UpdateUI();
@@ -332,9 +357,10 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         
         //remove knock button and set lastTurn variable for this PlayerScript
         //when it's this playerscript's turn and it's their last turn bc a player knocked
-        if (myTurn && Camera.main.GetComponent<Golf>().lastTurns) 
+        if (myTurn && g.lastTurns) 
         {
             overlay.RemoveKnockButton();
+
             if (!this.lastTurn) 
             {
                 this.lastTurn = true;
@@ -342,22 +368,34 @@ public class PlayerScript : MonoBehaviourPunCallbacks
         } 
         
         //do ui stuff when game state is set to roundover
-        if (Camera.main.gameObject.GetComponent<Golf>().gameState == eGolfGameState.roundover && !roundEndMessageSet) 
+        if (g.gameState == eGolfGameState.roundover) 
         {
-            overlay.RemoveOverlay();
-            overlay.ActivateRoundOver();
-            overlay.RemoveMessage();
-            Camera.main.gameObject.GetComponent<Golf>().FlipCards(true);
+            if (this.photonView.IsMine)
+            {
+                overlay.RemoveOverlay();
+                overlay.ActivateRoundOver();
+                overlay.RemoveKnockMessage();
+                g.FlipCards(true);
 
-            if (state == eGolfPlayerState.waiting) 
-            {   
-                if (this.photonView.IsMine) 
-                {
-                    SetUIMessage("waiting to go to next round...");
+                if (state == eGolfPlayerState.waiting) 
+                {   
+                    if (this.photonView.IsMine) 
+                    {
+                        SetUIMessage("waiting for next round to begin...");
+                    }
+                } else {
+                    overlay.RemoveMessage();
                 }
             }
+        }
 
-            roundEndMessageSet = true;
+        //do ui stuff when game state is gameover
+        if (g.gameState == eGolfGameState.gameover && state == eGolfPlayerState.waiting)
+        {
+            overlay.RemoveOverlay();
+            overlay.RemoveMessage();
+            overlay.DeactivateRoundOver();
+            overlay.TriggerGameOverDisplay();
         }
     }
 }

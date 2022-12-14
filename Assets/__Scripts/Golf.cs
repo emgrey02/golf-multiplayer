@@ -19,7 +19,7 @@ public class Golf : MonoBehaviourPunCallbacks
     public GameObject deckGO;
     public Deck deck;
 
-    public List<Card> deckCards;
+    public List<CardGolf> deckCards;
     public List<CardGolf> drawPile;
     public List<CardGolf> discardPile;
     public List<CardGolf> handCards;
@@ -35,6 +35,8 @@ public class Golf : MonoBehaviourPunCallbacks
     public static int ROUND_NUM;
 
     public bool lastTurns;
+
+    public string whoKnocked;
 
     private List<GameObject> playerGOs;
     private List<PlayerScript> playerPMs;
@@ -131,7 +133,7 @@ public class Golf : MonoBehaviourPunCallbacks
     {
         if (PhotonNetwork.IsMasterClient) 
         {
-            LoadNextRound();
+            Invoke("LoadNextRound", 1);
         }
     }
 
@@ -343,6 +345,11 @@ public class Golf : MonoBehaviourPunCallbacks
         if (state == "roundover") {
             gameState = eGolfGameState.roundover;
         }
+
+        if (state == "gameover")
+        {
+            gameState = eGolfGameState.gameover;
+        }
     }
 
     //sets the game state
@@ -394,12 +401,21 @@ public class Golf : MonoBehaviourPunCallbacks
             deckGO = PhotonNetwork.Instantiate("Deck", new Vector3(0, 0, 0), Quaternion.identity);
             DontDestroyOnLoad(deckGO);
         } else {
-            deckGO = PhotonView.Find(1003).gameObject;
+            if (playerPMs.Count == 2)
+            {
+                deckGO = PhotonView.Find(1003).gameObject;
+            } else if (playerPMs.Count == 3)
+            {
+                deckGO = PhotonView.Find(1004).gameObject;
+            } else 
+            {
+                deckGO = PhotonView.Find(1005).gameObject;
+            }
         }
         deck = GetComponent<Deck>();
         deckCards = deck.GetCards(deckGO);
         Deck.Shuffle(ref deckCards);
-        drawPile = ConvertListCardsToListCardGolfs(deckCards);
+        drawPile = deckCards;
         UpdateDrawPile();
     }
 
@@ -464,22 +480,33 @@ public class Golf : MonoBehaviourPunCallbacks
         {
             if (i == 0)
             {
-                playerPMs[i].PositionHand(localPositions);
-
+                for (int j = 0; j < 4; j++) 
+                {
+                    MoveThatCard(playerPMs[i].hand[j], localPositions[j]);
+                }
             }
             else if ((i == 1 && PhotonNetwork.PlayerList.Length == 2) || i == 2)
             {
-                playerPMs[i].PositionHand(oppPositions);
+                for (int j = 0; j < 4; j++) 
+                {
+                    MoveThatCard(playerPMs[i].hand[j], oppPositions[j]);
+                }
                 playerPMs[i].RotateHand(cardRots[1]);
             }
             else if ((i == 1 && PhotonNetwork.PlayerList.Length > 2))
             {
-                playerPMs[i].PositionHand(leftPositions);
+                for (int j = 0; j < 4; j++) 
+                {
+                    MoveThatCard(playerPMs[i].hand[j], leftPositions[j]);
+                }
                 playerPMs[i].RotateHand(cardRots[2]);
             }
             else if (i == 3)
             {
-                playerPMs[i].PositionHand(rightPositions);
+                for (int j = 0; j < 4; j++) 
+                {
+                    MoveThatCard(playerPMs[i].hand[j], rightPositions[j]);
+                }
                 playerPMs[i].RotateHand(cardRots[3]);
             }
 
@@ -536,7 +563,23 @@ public class Golf : MonoBehaviourPunCallbacks
     {
         CardGolf cd = drawPile[drawPile.Count - 1]; 
         drawPile.RemoveAt(drawPile.Count - 1);
+        CheckDrawpile();
         return (cd);
+    }
+
+    //check whether draw pile is empty
+    //if so, put discard pile as draw pile,
+    //shuffle, and update each pile
+    private void CheckDrawpile()
+    {
+        if (drawPile.Count == 0)
+        {
+            drawPile = discardPile;
+            Deck.Shuffle(ref drawPile);
+            discardPile = new List<CardGolf>();
+            UpdateDiscardPile();
+            UpdateDrawPile();
+        }
     }
 
     //draws a card from the discard pile and returns it
@@ -688,6 +731,9 @@ public class Golf : MonoBehaviourPunCallbacks
 
                             //round is over, tally scores
                             PostScores();
+
+                            //check for game over
+                            CheckForGameOver();
                         } else 
                         {
                             SetGameState("playing");
@@ -705,6 +751,18 @@ public class Golf : MonoBehaviourPunCallbacks
         }
     }
 
+    //Checks whether it is the 9th round and then switches game
+    //and player state
+    public void CheckForGameOver()
+    {
+        if (ROUND_NUM == 9) {
+            SetGameState("gameover");
+            ChangePlayerStates("waiting");
+        }
+    }
+
+    //Gives Scoreboard info to calculate and post scores
+    //calls RPC
     private void PostScores() {
         for (int i = 0; i < playerPMs.Count; i++) {
             scoreboard.photonView.RPC("TallyScores", RpcTarget.All, playerPMs[i].playerName, ConvertHandToStrings(playerPMs[i].hand));
@@ -725,6 +783,12 @@ public class Golf : MonoBehaviourPunCallbacks
         return roundEnd;
     }
 
+    [PunRPC]
+    public void SyncKnock(string name)
+    {
+        this.whoKnocked = name;
+    }
+
     //called when a player knocks
     //calls RPCs
     //syncs lastTurns variable, assigns next turn immediately (knocking is the whole turn)
@@ -732,6 +796,15 @@ public class Golf : MonoBehaviourPunCallbacks
         byte eventCode = photonEvent.Code;
         if (eventCode == onKnockEventCode) 
         {
+            //get player who knocked and sync knocked status
+            for (int i = 0; i < playerPMs.Count; i++)
+            {
+                if (currentPlayerTurn == playerPMs[i].actorNum)
+                {
+                    this.photonView.RPC(nameof(SyncKnock), RpcTarget.All, playerPMs[i].playerName);
+                }
+            }
+
             int nextTurn = GetNextTurn();
             this.photonView.RPC(nameof(SetLastTurns), RpcTarget.All, true);
             this.photonView.RPC(nameof(AssignTurn), RpcTarget.All, nextTurn);
@@ -739,6 +812,9 @@ public class Golf : MonoBehaviourPunCallbacks
     }
 
     //handles drawing a card
+    //sets player state and game state according to which
+    //pile the player drew from, moves cards to approapriate places,
+    //and updates each pile
     private void OnDrawEvent(EventData photonEvent)
     {
         byte eventCode = photonEvent.Code;
@@ -755,7 +831,7 @@ public class Golf : MonoBehaviourPunCallbacks
                     if (data == "drawpile")
                     {
                         SetPlayerState(playerPMs[i].photonView, "deciding");
-                        MoveToTarget(Draw());
+                        MoveToTarget(playerPMs[i].handRotation, Draw());
                         UpdateDrawPile();
 
                     //if player drew from discard pile
@@ -764,7 +840,7 @@ public class Golf : MonoBehaviourPunCallbacks
                     {
                         SetPlayerState(playerPMs[i].photonView, "swapping");
                         SetGameState("swapping");
-                        MoveToTarget(DrawFromDiscard());
+                        MoveToTarget(playerPMs[i].handRotation, DrawFromDiscard());
                         UpdateDiscardPile();
                     }
                 }
@@ -773,7 +849,8 @@ public class Golf : MonoBehaviourPunCallbacks
     }
 
     //Adds a card to the discard pile
-    //calls RPCs to sync card state and props
+    //calls RPCs 
+    //to sync card state and props
     //updates discard pile at end
     void MoveToDiscard(CardGolf cd)
     {
@@ -785,14 +862,16 @@ public class Golf : MonoBehaviourPunCallbacks
     }
 
     //adds target card to our hand in correct position
+    //calls RPCs
     //parameter is the card in our hand that we clicked on to swap with
     public void AddTargetToHand(CardGolf cd)
     {
         print("adding target to hand");
+        
         //get position of card we clicked
         Vector3 cardPos = cd.gameObject.transform.localPosition;
 
-        target.pos = cardPos;
+        //target.pos = cardPos;
         moveCard(target, cardPos);
 
         target.photonView.RPC("SetCardProps", RpcTarget.All, false, 0, "hand");
@@ -826,17 +905,15 @@ public class Golf : MonoBehaviourPunCallbacks
     //calls RPCs
     //syncs card props (only on the current player turn)
     //syncs card state, and target field on every client
-    void MoveToTarget(CardGolf cd)
-    {
-        Quaternion currentRot = Camera.main.transform.rotation;
-        
+    void MoveToTarget(Quaternion handRot, CardGolf cd)
+    {    
         moveCard(cd, new Vector3(0, 0, 0));
-        cd.photonView.transform.rotation = currentRot;
+        cd.photonView.transform.localRotation = handRot;
+        cd.photonView.transform.localScale = new Vector3(1.4f, 1.4f, 0);
 
         cd.photonView.RPC("SetCardProps", PhotonNetwork.CurrentRoom.GetPlayer(currentPlayerTurn), true, 300, "target");
         this.photonView.RPC(nameof(SetTargetCard), RpcTarget.All, cd.name);
         cd.photonView.RPC("SetCardState", RpcTarget.All, "target");
-
     }
 
     //arranges all the cards of the drawPile
@@ -852,10 +929,14 @@ public class Golf : MonoBehaviourPunCallbacks
         {
             int sortOrder = 10 * i;
             cd = drawPile[i];
+
             cd.photonView.RPC("SetCardState", RpcTarget.All, "drawpile");
-            cd.photonView.transform.localPosition = new Vector3(-1.5f, 0, 0);
             cd.photonView.RPC("SetCardProps", RpcTarget.All, false, sortOrder, "drawpile");
             cd.photonView.RPC("SetOwner", RpcTarget.All, 0);
+
+            moveCard(cd, new Vector3(-1.5f, 0, 0));
+            cd.photonView.transform.localRotation = Quaternion.identity;
+            cd.photonView.transform.localScale = new Vector3(1, 1, 1);
         }
     }
 
@@ -874,10 +955,12 @@ public class Golf : MonoBehaviourPunCallbacks
             int sortOrder = 10 * i;
             cd = discardPile[i];
             cd.photonView.RPC("SetCardState", RpcTarget.All, "discardpile");
-            moveCard(cd, new Vector3(1.5f, 0, 0));
-            cd.photonView.transform.rotation = Quaternion.identity;
             cd.photonView.RPC("SetCardProps", RpcTarget.All, true, sortOrder, "discardpile");
             cd.photonView.RPC("SetOwner", RpcTarget.All, 0);
+
+            moveCard(cd, new Vector3(1.5f, 0, 0));
+            cd.photonView.transform.localRotation = Quaternion.identity;
+            cd.photonView.transform.localScale = new Vector3(1, 1, 1);
         }
     }   
 }

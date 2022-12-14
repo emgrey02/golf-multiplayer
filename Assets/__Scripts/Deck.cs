@@ -256,9 +256,9 @@ public class Deck : MonoBehaviourPunCallbacks {
 		return (null);  // couldn't find the sprite (should never reach this line)
 	 }// getFace 
 
-	 static public void Shuffle(ref List<Card> oCards)
+	 static public void Shuffle(ref List<CardGolf> oCards)
 	 {
-	 	List<Card> tCards = new List<Card>();
+	 	List<CardGolf> tCards = new List<CardGolf>();
 
 	 	int ndx;   // which card to move
 
@@ -277,9 +277,9 @@ public class Deck : MonoBehaviourPunCallbacks {
 	 	//for ref paramters changes made in the function persist.
 	 }
 
-	public List<Card> GetCards(GameObject deckGO)
+	public List<CardGolf> GetCards(GameObject deckGO)
 	{
-		Card[] cardChildren = deckGO.GetComponentsInChildren<Card>();
+		CardGolf[] cardChildren = deckGO.GetComponentsInChildren<CardGolf>();
 		return cardChildren.ToList();
 	}
 
