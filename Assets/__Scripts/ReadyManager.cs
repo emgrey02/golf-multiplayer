@@ -1,8 +1,6 @@
 using Photon.Pun;
-using System.Collections;
-using System.Collections.Generic;
 using TMPro;
-using UnityEngine;
+
 
 public class ReadyManager : MonoBehaviourPunCallbacks
 {
@@ -13,10 +11,20 @@ public class ReadyManager : MonoBehaviourPunCallbacks
         text = GetComponent<TextMeshProUGUI>();
     }
 
+    //PreGameUI calls this on correct ready view according to what
+    //player calls it
+    //syncs this photonView with all clients
     [PunRPC]
-    void SyncReady(PhotonMessageInfo info)
+    public void SyncReady(bool ready)
     {
-        Debug.LogFormat("Info: {0} {1} {2}", info.Sender, info.photonView, info.SentServerTime);
-        text.text = "READY!";
+        if (ready)
+        {
+            text.gameObject.SetActive(true);
+            text.text = "READY!";
+        }
+        else {
+            text.text = "";
+            text.gameObject.SetActive(false);
+        }
     }
 }

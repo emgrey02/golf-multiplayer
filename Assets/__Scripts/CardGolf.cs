@@ -25,28 +25,11 @@ public class CardGolf : Card
         base.OnMouseUpAsButton();
     }
 
-    private Vector3 _pos;
-
     public int owner;
-
-    public Vector3 pos {
-		get {
-			return this._pos;
-		}
-
-		set {
-			this._pos = value;
-        }
-	}
 
     [PunRPC]
     public void SetOwner(int actorNum) {
         this.owner = actorNum;
-    }
-
-    [PunRPC]
-    public void SetCardPos(Vector3 p) {
-        this.pos = p;
     }
 
     [PunRPC]

@@ -29,14 +29,6 @@ public class CreateAndJoinRooms : MonoBehaviourPunCallbacks
     {
         string name = "";
         TMP_InputField input = nameStuff.GetComponent<TMP_InputField>();
-        if (input != null)
-        {
-            if (PlayerPrefs.HasKey(ppKey))
-            {
-                name = PlayerPrefs.GetString(ppKey);
-                input.text = name;
-            }
-        }
         PhotonNetwork.NickName = name;
     }
 
@@ -52,14 +44,7 @@ public class CreateAndJoinRooms : MonoBehaviourPunCallbacks
 
     public void SetPlayerName(string name)
     {
-        if (string.IsNullOrEmpty(name))
-        {
-            Debug.LogError("Player Name is null or empty");
-            return;
-        }
         PhotonNetwork.NickName = name;
-
-        PlayerPrefs.SetString(ppKey, name);
     }
 
     public void StartGame()

@@ -54,7 +54,7 @@ public class Card : MonoBehaviourPunCallbacks {
 		}
 	}
 	
-	// sets the sortingOrder of all SpriteRenderer Components
+	//sets the sortingOrder of all SpriteRenderer Components
 	public void SetSortOrder(int sOrd)
 	{
 		PopulateSpriteRenderers();
