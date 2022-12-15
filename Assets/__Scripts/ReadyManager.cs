@@ -15,16 +15,8 @@ public class ReadyManager : MonoBehaviourPunCallbacks
     //player calls it
     //syncs this photonView with all clients
     [PunRPC]
-    public void SyncReady(bool ready)
+    public void SyncReady()
     {
-        if (ready)
-        {
-            text.gameObject.SetActive(true);
-            text.text = "READY!";
-        }
-        else {
-            text.text = "";
-            text.gameObject.SetActive(false);
-        }
+        text.text = "READY!";
     }
 }
