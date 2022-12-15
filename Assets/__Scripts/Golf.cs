@@ -64,7 +64,7 @@ public class Golf : MonoBehaviourPunCallbacks
 
     private void Awake()
     {
-        this.photonView.RPC("UpdateFieldsOnNewRound", RpcTarget.All);
+        this.photonView.RPC(nameof(UpdateFieldsOnNewRound), RpcTarget.All);
         playerGOs = new List<GameObject>();
         playerPMs = new List<PlayerScript>();
         playerNames = new List<string>();
@@ -137,6 +137,7 @@ public class Golf : MonoBehaviourPunCallbacks
         }
     }
 
+    
     [PunRPC]
     public void UpdateFieldsOnNewRound()
     {
@@ -178,6 +179,8 @@ public class Golf : MonoBehaviourPunCallbacks
         yield return null;
     }
 
+    //called when new round starts
+    //resets player and room custom props
     public void ResetCustProps() {
         print("resetting custom props");
         Hashtable custProps = new Hashtable();
@@ -397,10 +400,12 @@ public class Golf : MonoBehaviourPunCallbacks
     //instantiates deck prefab, shuffles the deck, and creates the draw pile
     private void CreateDeck()
     {
-        if (ROUND_NUM == 1) {
+        if (ROUND_NUM == 1) 
+        {
             deckGO = PhotonNetwork.Instantiate("Deck", new Vector3(0, 0, 0), Quaternion.identity);
             DontDestroyOnLoad(deckGO);
-        } else {
+        } else 
+        {
             if (playerPMs.Count == 2)
             {
                 deckGO = PhotonView.Find(1003).gameObject;
@@ -412,6 +417,7 @@ public class Golf : MonoBehaviourPunCallbacks
                 deckGO = PhotonView.Find(1005).gameObject;
             }
         }
+
         deck = GetComponent<Deck>();
         deckCards = deck.GetCards(deckGO);
         Deck.Shuffle(ref deckCards);
@@ -871,7 +877,6 @@ public class Golf : MonoBehaviourPunCallbacks
         //get position of card we clicked
         Vector3 cardPos = cd.gameObject.transform.localPosition;
 
-        //target.pos = cardPos;
         moveCard(target, cardPos);
 
         target.photonView.RPC("SetCardProps", RpcTarget.All, false, 0, "hand");
@@ -908,7 +913,12 @@ public class Golf : MonoBehaviourPunCallbacks
     void MoveToTarget(Quaternion handRot, CardGolf cd)
     {    
         moveCard(cd, new Vector3(0, 0, 0));
-        cd.photonView.transform.localRotation = handRot;
+        
+        //don't need to flip card 180 degrees
+        if (handRot != cardRots[1]) {
+            cd.photonView.transform.localRotation = handRot;
+        }
+        //scale card up
         cd.photonView.transform.localScale = new Vector3(1.4f, 1.4f, 0);
 
         cd.photonView.RPC("SetCardProps", PhotonNetwork.CurrentRoom.GetPlayer(currentPlayerTurn), true, 300, "target");
@@ -935,7 +945,7 @@ public class Golf : MonoBehaviourPunCallbacks
             cd.photonView.RPC("SetOwner", RpcTarget.All, 0);
 
             moveCard(cd, new Vector3(-1.5f, 0, 0));
-            cd.photonView.transform.localRotation = Quaternion.identity;
+            cd.photonView.transform.localRotation = cardRots[0];
             cd.photonView.transform.localScale = new Vector3(1, 1, 1);
         }
     }
